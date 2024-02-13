@@ -37,18 +37,18 @@
 
 .chatEmptyStateTitle {
     font-style: normal;
-    font-weight: 700;
-    font-size: 36px;
+    font-weight: 0;
+    font-size: 0px;
     display: flex;
     align-items: flex-end;
     text-align: center;
-    line-height: 24px;
-    margin-top: 24px;
+    line-height: 0px;
+    margin-top: 0px;
     margin-bottom: 0px;
 }
 
 .chatEmptyStateSubtitle {
-    margin-top: 20px;
+    margin-top: px;
     font-style: normal;
     font-weight: 400;
     font-size: 16px;
