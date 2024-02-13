@@ -628,7 +628,7 @@ const Chat = () => {
                                     className={styles.chatIcon}
                                     aria-hidden="true"
                                 />
-                                <h1 className={styles.chatEmptyStateTitle}>B & W Distributors Product Chatbot</h1>
+                                <h1 className={styles.chatEmptyStateTitle}>B & W Distributors Chatbot</h1>
                                 <h2 className={styles.chatEmptyStateSubtitle}>This chatbot is configured to your top 20 products</h2>
                             </Stack>
                         ) : (
