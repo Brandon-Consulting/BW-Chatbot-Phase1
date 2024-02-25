@@ -230,6 +230,7 @@
     flex-grow: 0;
 }
 
+/*
 .citationPanel {
     display: flex;
     flex-direction: column;
@@ -305,7 +306,7 @@ a {
     padding-left: 5px;
     padding-right: 5px;
 }
-
+*/
 .viewSourceButton {
     font-style: normal;
     font-weight: 600;

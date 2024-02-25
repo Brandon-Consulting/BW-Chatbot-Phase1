@@ -12,12 +12,11 @@ import DOMPurify from 'dompurify';
 import styles from "./Chat.module.css";
 import BWLogo from "../../assets/BWLogo.svg";
 import { XSSAllowTags } from "../../constants/xssAllowTags";
-
+import { AskResponse, Citation } from "../../api";
 import {
     ChatMessage,
     ConversationRequest,
     conversationApi,
-    Citation,
     ToolMessageContent,
     ChatResponse,
     getUserInfo,
@@ -580,10 +579,10 @@ const Chat = () => {
         setIsCitationPanelOpen(true);
     };
 
-    const onViewSource = (citation: Citation) => {
-        if (citation.url && !citation.url.includes("blob.core")) {
-            window.open(citation.url, "_blank");
-        }
+   const onViewSource = (citation: Citation) => {
+       if (citation.url && !citation.url.includes("blob.core")) {
+           window.open(citation.url, "_blank");
+       }
     };
 
     const parseCitationFromMessage = (message: ChatMessage) => {
@@ -668,7 +667,7 @@ const Chat = () => {
                                                     answer: "Generating answer...",
                                                     citations: []
                                                 }}
-                                                onCitationClicked={() => null}
+                                               onCitationClicked={() => null}
                                             />
                                         </div>
                                     </>
@@ -759,7 +758,7 @@ const Chat = () => {
                         </Stack>
                     </div>
                     {/* Citation Panel */}
-                    {messages && messages.length > 0 && isCitationPanelOpen && activeCitation && (
+                 {/*   {messages && messages.length > 0 && isCitationPanelOpen && activeCitation && (
                         <Stack.Item className={styles.citationPanel} tabIndex={0} role="tabpanel" aria-label="Citations Panel">
                             <Stack aria-label="Citations Panel Header Container" horizontal className={styles.citationPanelHeaderContainer} horizontalAlign="space-between" verticalAlign="center">
                                 <span aria-label="Citations" className={styles.citationPanelHeader}>Citations</span>
@@ -777,6 +776,7 @@ const Chat = () => {
                             </div>
                         </Stack.Item>
                     )}
+                 */}
                     {(appStateContext?.state.isChatHistoryOpen && appStateContext?.state.isCosmosDBAvailable?.status !== CosmosDBStatus.NotConfigured) && <ChatHistoryPanel />}
                 </Stack>
             )}

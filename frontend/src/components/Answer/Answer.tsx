@@ -6,7 +6,7 @@ import { AppStateContext } from '../../state/AppProvider';
 
 import styles from "./Answer.module.css";
 
-import { AskResponse, Citation, Feedback, historyMessageFeedback } from "../../api";
+import { AskResponse, Feedback, historyMessageFeedback, Citation } from "../../api";
 import { parseAnswer } from "./AnswerParser";
 
 import ReactMarkdown from "react-markdown";
@@ -15,14 +15,16 @@ import supersub from 'remark-supersub'
 import { ThumbDislike20Filled, ThumbLike20Filled } from "@fluentui/react-icons";
 import { XSSAllowTags } from "../../constants/xssAllowTags";
 
+
 interface Props {
     answer: AskResponse;
-    onCitationClicked: (citedDocument: Citation) => void;
+    onCitationClicked?: (citation: Citation) => void;
 }
 
 export const Answer = ({
     answer,
-    onCitationClicked
+
+
 }: Props) => {
     const initializeAnswerFeedback = (answer: AskResponse) => {
         if (answer.message_id == undefined) return undefined;
@@ -35,7 +37,63 @@ export const Answer = ({
     const [isRefAccordionOpen, { toggle: toggleIsRefAccordionOpen }] = useBoolean(false);
     const filePathTruncationLimit = 50;
 
-    const parsedAnswer = useMemo(() => parseAnswer(answer), [answer]);
+    
+
+    const [isFetching, setIsFetching] = useState(false);
+    const [error, setError] = useState(null);
+    
+    useEffect(() => {
+        // Call to Azure Function should go here
+        const fetchDatasheetInfo = async () => {
+            if (isFetching) return; //Prevent muliple calls
+            setIsFetching(true);
+            setError(null); // Reset error state
+            // Replace this URL with the actual endpoint of your Azure Function
+            const azureFunctionUrl = 'https://bw-chatbot.azurewebsites.net/api/DataSheetFunction?';
+            
+            try {
+                // Assuming `answer` is an object with `answer` and `citations` properties
+                // and you only want to send the `answer` part.
+                const payload = {
+                 chat_output: {
+                    answer: answer.answer // send only the answer text, not the citations
+        }
+    };
+                const response = await fetch(azureFunctionUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-functions-key':'1O88V7rwF1-x83XR4-NNQLSyWol9E3Tt0rMmrQtQAN7jAzFuNASUxw=='
+                        // Include the Azure Function key if required for security
+                    },
+                    body: JSON.stringify(payload), // send the modified payload
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Azure Function call failed with status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                // Assuming your Azure Function returns an object with datasheetUrl and productName
+                setDatasheetUrl(data.DataSheetLink);
+            } catch (error) {
+                console.error('Failed to fetch datasheet info:', error);
+            }
+        };
+
+        if (answer) {
+            fetchDatasheetInfo();
+        }
+
+        return () => {};
+
+    }, [answer]);
+
+    const [datasheetURL, setDatasheetUrl] = useState('');
+    // Assuming parseAnswer can handle datasheetUrl and productName
+    const parsedAnswer = useMemo(() => parseAnswer(answer, datasheetURL), [answer, datasheetURL]);
+    // ... (the rest of your component code)
+    console.log('DataSheet URL:', datasheetURL);
     const [chevronIsExpanded, setChevronIsExpanded] = useState(isRefAccordionOpen);
     const [feedbackState, setFeedbackState] = useState(initializeAnswerFeedback(answer));
     const [isFeedbackDialogOpen, setIsFeedbackDialogOpen] = useState(false);
@@ -175,7 +233,16 @@ export const Answer = ({
             </>
         );
     }
+    const onCitationClicked = (citation: Citation, event: React.MouseEvent<HTMLElement> | React.KeyboardEvent<HTMLElement>) => {
+         // Prevent the default action of the event (which is navigating to a link's href).
+        event.preventDefault();
 
+  // Here you can add whatever logic you need to handle the click.
+  // For example, you could update the state to show a modal with the citation details.
+  console.log(`Citation clicked: ${citation.id}`);
+  // ... other logic to handle the click event
+
+};
     return (
         <>
             <Stack className={styles.answerContainer} tabIndex={0}>
@@ -189,6 +256,13 @@ export const Answer = ({
                                 children={DOMPurify.sanitize(parsedAnswer.markdownFormatText, {ALLOWED_TAGS: XSSAllowTags})}
                                 className={styles.answerText}
                             />
+                           
+                             {datasheetURL && (
+                                <p>
+                                    Datasheet: <a href={datasheetURL} target="_blank" rel="noopener noreferrer"></a>
+                                </p>
+                            )}
+                            
                         </Stack.Item>
                         <Stack.Item className={styles.answerHeader}>
                             {FEEDBACK_ENABLED && answer.message_id !== undefined && <Stack horizontal horizontalAlign="space-between">
@@ -213,6 +287,7 @@ export const Answer = ({
                     </Stack>
                     
                 </Stack.Item>
+                
                 <Stack horizontal className={styles.answerFooter}>
                 {!!parsedAnswer.citations.length && (
                     <Stack.Item
@@ -235,6 +310,7 @@ export const Answer = ({
                             </Stack>
                             
                         </Stack>
+                                
                     </Stack.Item>
                 )}
                 <Stack.Item className={styles.answerDisclaimerContainer}>
@@ -249,18 +325,23 @@ export const Answer = ({
                                     title={createCitationFilepath(citation, ++idx)} 
                                     tabIndex={0} 
                                     role="link" 
-                                    key={idx} 
-                                    onClick={() => onCitationClicked(citation)} 
-                                    onKeyDown={e => e.key === "Enter" || e.key === " " ? onCitationClicked(citation) : null}
+                                    key={idx}
                                     className={styles.citationContainer}
-                                    aria-label={createCitationFilepath(citation, idx)}
+                                    aria-label={createCitationFilepath(citation, idx)} 
+                                    onClick={() => window.open(datasheetURL, '_blank')}
+                                    onKeyDown={(event) => {
+                                        if (event.key === "Enter" || event.key === " ") {
+                                          window.open(datasheetURL, '_blank');
+                                        }
+                                      }}
+                    
                                 >
                                     <div className={styles.citation}>{idx}</div>
                                     {createCitationFilepath(citation, idx, true)}
                                 </span>);
                         })}
                     </div>
-                }
+}
             </Stack>
             <Dialog 
                 onDismiss={() => {
@@ -297,7 +378,7 @@ export const Answer = ({
                     
                     <DefaultButton disabled={negativeFeedbackList.length < 1} onClick={onSubmitNegativeFeedback}>Submit</DefaultButton>
                 </Stack>
-                
+
             </Dialog>
         </>
     );

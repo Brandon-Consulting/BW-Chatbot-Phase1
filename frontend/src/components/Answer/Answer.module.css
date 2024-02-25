@@ -59,7 +59,7 @@
     flex-grow: 0;
 }
 
-.citationContainer {
+/*.citationContainer {
     margin-left: 10px;
     font-style: normal;
     font-weight: 600;
@@ -108,7 +108,7 @@
     text-decoration: underline;
     cursor: pointer;
 }
-
+*/
 .accordionIcon {
     display: inline-flex;
     flex-direction: row;
