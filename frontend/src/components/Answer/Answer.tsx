@@ -41,7 +41,7 @@ export const Answer = ({
 
     const [isFetching, setIsFetching] = useState(false);
     const [error, setError] = useState(null);
-    const delay = 3000; // Delay in milliseconds, e.g., 3000ms for 3 seconds
+    const delay = 5000; // Delay in milliseconds, e.g., 3000ms for 3 seconds
     
     useEffect(() => {
         const fetchDatasheetInfo = async () => {
