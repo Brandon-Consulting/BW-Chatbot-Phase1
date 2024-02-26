@@ -41,53 +41,57 @@ export const Answer = ({
 
     const [isFetching, setIsFetching] = useState(false);
     const [error, setError] = useState(null);
+    const delay = 3000; // Delay in milliseconds, e.g., 3000ms for 3 seconds
     
     useEffect(() => {
-        // Call to Azure Function should go here
         const fetchDatasheetInfo = async () => {
-            if (isFetching) return; //Prevent muliple calls
+            if (isFetching) return; // Prevent multiple calls
             setIsFetching(true);
             setError(null); // Reset error state
-            // Replace this URL with the actual endpoint of your Azure Function
+    
             const azureFunctionUrl = 'https://bw-chatbot.azurewebsites.net/api/DataSheetFunction?';
-            
+    
             try {
-                // Assuming `answer` is an object with `answer` and `citations` properties
-                // and you only want to send the `answer` part.
                 const payload = {
-                 chat_output: {
-                    answer: answer.answer // send only the answer text, not the citations
-        }
-    };
+                    chat_output: {
+                        answer: answer.answer // send only the answer text, not the citations
+                    }
+                };
                 const response = await fetch(azureFunctionUrl, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'x-functions-key':'1O88V7rwF1-x83XR4-NNQLSyWol9E3Tt0rMmrQtQAN7jAzFuNASUxw=='
+                        'x-functions-key': '1O88V7rwF1-x83XR4-NNQLSyWol9E3Tt0rMmrQtQAN7jAzFuNASUxw=='
                         // Include the Azure Function key if required for security
                     },
                     body: JSON.stringify(payload), // send the modified payload
                 });
-
+    
                 if (!response.ok) {
                     throw new Error(`Azure Function call failed with status: ${response.status}`);
                 }
-
+    
                 const data = await response.json();
                 // Assuming your Azure Function returns an object with datasheetUrl and productName
                 setDatasheetUrl(data.DataSheetLink);
             } catch (error) {
                 console.error('Failed to fetch datasheet info:', error);
+            } finally {
+                setIsFetching(false);
             }
         };
-
-        if (answer) {
-            fetchDatasheetInfo();
-        }
-
-        return () => {};
-
-    }, [answer]);
+    
+        // Delay the API call
+        const timeoutId = setTimeout(() => {
+            if (answer) {
+                fetchDatasheetInfo();
+            }
+        }, delay);
+    
+        // Clear the timeout if the component unmounts
+        return () => clearTimeout(timeoutId);
+    
+    }, [answer, isFetching, delay]); // Include isFetching and delay if they are expected to change, otherwise they can be omitted
 
     const [datasheetURL, setDatasheetUrl] = useState('');
     // Assuming parseAnswer can handle datasheetUrl and productName
