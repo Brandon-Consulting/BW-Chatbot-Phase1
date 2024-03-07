@@ -44,8 +44,9 @@ export const Answer = ({
     const delay = 4500; // Delay in milliseconds, e.g., 3000ms for 3 seconds
     
     useEffect(() => {
+        let isCancelled = false; //Prevents state update if the compoenents unmoun
         const fetchDatasheetInfo = async () => {
-            if (isFetching) return; // Prevent multiple calls
+            if (isFetching || !answer) return; // Prevent multiple calls
             setIsFetching(true);
             setError(null); // Reset error state
     
@@ -61,7 +62,7 @@ export const Answer = ({
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'x-functions-key': '1O88V7rwF1-x83XR4-NNQLSyWol9E3Tt0rMmrQtQAN7jAzFuNASUxw=='
+                        //'x-functions-key': 
                         // Include the Azure Function key if required for security
                     },
                     body: JSON.stringify(payload), // send the modified payload
@@ -72,26 +73,31 @@ export const Answer = ({
                 }
     
                 const data = await response.json();
+                if (!isCancelled) {
                 // Assuming your Azure Function returns an object with datasheetUrl and productName
-                setDatasheetUrl(data.DataSheetLink);
+                    setDatasheetUrl(data.DataSheetLink);
+                }
             } catch (error) {
-                console.error('Failed to fetch datasheet info:', error);
+                if (!isCancelled) {
+                    console.error('Failed to fetch datasheet info:', error);
+                }
             } finally {
-                setIsFetching(false);
+                if (!isCancelled) {
+                    setIsFetching(false);
+                }
             }
         };
     
         // Delay the API call
-        const timeoutId = setTimeout(() => {
-            if (answer) {
-                fetchDatasheetInfo();
-            }
-        }, delay);
-    
-        // Clear the timeout if the component unmounts
-        return () => clearTimeout(timeoutId);
-    
-    }, [answer, isFetching, delay]); // Include isFetching and delay if they are expected to change, otherwise they can be omitted
+        const timeoutId = setTimeout(fetchDatasheetInfo, delay);
+
+        // Cleanup function to cancel the operation if the component unmounts
+        return () => {
+            isCancelled = true;
+            clearTimeout(timeoutId);
+        };
+
+    }, [answer]); // Removed isFetching from the dependencies
 
     const [datasheetURL, setDatasheetUrl] = useState('');
     // Assuming parseAnswer can handle datasheetUrl and productName
