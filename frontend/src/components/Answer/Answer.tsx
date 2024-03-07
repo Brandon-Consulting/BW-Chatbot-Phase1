@@ -49,7 +49,7 @@ export const Answer = ({
             setIsFetching(true);
             setError(null); // Reset error state
     
-            const azureFunctionUrl = 'https://bw-chatbot.azurewebsites.net/api/DataSheetFunction?';
+            const quartMicroserviceEndpoint = 'https://quartazurefunction.azurewebsites.net/api/call-function';
     
             try {
                 const payload = {
@@ -57,7 +57,7 @@ export const Answer = ({
                         answer: answer.answer // send only the answer text, not the citations
                     }
                 };
-                const response = await fetch(azureFunctionUrl, {
+                const response = await fetch(quartMicroserviceEndpoint, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
