@@ -79,7 +79,7 @@ export const Answer = ({
         } finally {
             setIsFetching(false);
         }
-    }, [isFetching, answer]);
+    }, [answer]);
     
     const debouncedFetchDataSheetInfo = useCallback(debounce(() => {
         fetchDatasheetInfo();
