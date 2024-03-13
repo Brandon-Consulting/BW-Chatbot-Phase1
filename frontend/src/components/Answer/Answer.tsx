@@ -46,58 +46,51 @@ export const Answer = ({
 
     
   
-    const fetchDatasheetInfo = async () => {
-            if (isFetching || !answer) return; // Prevent multiple calls
-            setIsFetching(true);
-            setError(null); // Reset error state
+    const fetchDatasheetInfo = useCallback(async () => {
+        if (isFetching || !answer) return;
+        setIsFetching(true);
+        setError(null);
     
-            const quartMicroserviceEndpoint = 'https://quartazurefunction.azurewebsites.net/api/call-function';
+        const quartMicroserviceEndpoint = 'https://quartazurefunction.azurewebsites.net/api/call-function';
     
-            try {
-                const payload = {
-                    chat_output: {
-                        answer: answer.answer // send only the answer text, not the citations
-                    }
-                };
-                const response = await fetch(quartMicroserviceEndpoint, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        //'x-functions-key': 
-                        // Include the Azure Function key if required for security
-                    },
-                    body: JSON.stringify(payload), // send the modified payload
-                });
-    
-                if (!response.ok) {
-                    throw new Error(`Azure Function call failed with status: ${response.status}`);
+        try {
+            const payload = {
+                chat_output: {
+                    answer: answer.answer
                 }
-    
-                const data = await response.json();
-                setDatasheetUrl(data.DataSheetLink);  
-            } catch (error: any) {
-                console.error('Failed to fetch datasheet info:', error);
-                setError(error.message);
-            } finally {
-                setIsFetching(false);
-                };
-                
-    const debouncedFetchDataSheetInfo = useCallback(
-            debounce(() => {
-                fetchDatasheetInfo();
-                }, 1000),
-                [answer] // Specify 'answer' as a dependency if it's used in fetchDatasheetInfo and its changes should trigger the effect
-            );
-            
-                // UseEffect to call the debounced function
-    useEffect(() => {
-            debouncedFetchDataSheetInfo();
-            
-                    // Cleanup function to cancel the debounced call if the component unmounts
-            return () => {
-                debouncedFetchDataSheetInfo.cancel();
             };
-                }, [debouncedFetchDataSheetInfo]); // Depend on the debounced function itself
+            const response = await fetch(quartMicroserviceEndpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+            });
+    
+            if (!response.ok) {
+                throw new Error(`Azure Function call failed with status: ${response.status}`);
+            }
+    
+            const data = await response.json();
+            setDatasheetUrl(data.DataSheetLink);
+        } catch (error: any) {
+            console.error('Failed to fetch datasheet info:', error);
+            setError(error.message);
+        } finally {
+            setIsFetching(false);
+        }
+    }, [isFetching, answer]);
+    
+    const debouncedFetchDataSheetInfo = useCallback(debounce(() => {
+        fetchDatasheetInfo();
+    }, 3000), [fetchDatasheetInfo]);
+    
+    useEffect(() => {
+        debouncedFetchDataSheetInfo();
+        return () => {
+            debouncedFetchDataSheetInfo.cancel();
+        };
+    }, [debouncedFetchDataSheetInfo]);
 
     // Assuming parseAnswer can handle datasheetUrl and productName
     const parsedAnswer = useMemo(() => parseAnswer(answer, datasheetURL), [answer, datasheetURL]);
@@ -391,4 +384,4 @@ export const Answer = ({
             </Dialog>
         </>
     );
-}};
+};
