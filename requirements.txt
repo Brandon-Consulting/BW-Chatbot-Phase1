@@ -11,3 +11,4 @@ aiohttp==3.9.2
 azure-functions
 pyodbc==5.0.1
 gunicorn
+lodash.debounce

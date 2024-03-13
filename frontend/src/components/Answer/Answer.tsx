@@ -1,8 +1,9 @@
-import { FormEvent, useEffect, useMemo, useState, useContext } from "react";
+import { FormEvent, useEffect, useMemo, useState, useContext, useCallback } from "react";
 import { useBoolean } from "@fluentui/react-hooks"
 import { Checkbox, DefaultButton, Dialog, FontIcon, Stack, Text } from "@fluentui/react";
 import DOMPurify from 'dompurify';
 import { AppStateContext } from '../../state/AppProvider';
+import debounce from 'lodash.debounce'
 
 import styles from "./Answer.module.css";
 
@@ -41,11 +42,11 @@ export const Answer = ({
 
     const [isFetching, setIsFetching] = useState(false);
     const [error, setError] = useState(null);
-    const delay = 4500; // Delay in milliseconds, e.g., 3000ms for 3 seconds
+    const [datasheetURL, setDatasheetUrl] = useState('');
+
     
-    useEffect(() => {
-        let isCancelled = false; //Prevents state update if the compoenents unmoun
-        const fetchDatasheetInfo = async () => {
+  
+    const fetchDatasheetInfo = async () => {
             if (isFetching || !answer) return; // Prevent multiple calls
             setIsFetching(true);
             setError(null); // Reset error state
@@ -73,33 +74,31 @@ export const Answer = ({
                 }
     
                 const data = await response.json();
-                if (!isCancelled) {
-                // Assuming your Azure Function returns an object with datasheetUrl and productName
-                    setDatasheetUrl(data.DataSheetLink);
-                }
-            } catch (error) {
-                if (!isCancelled) {
-                    console.error('Failed to fetch datasheet info:', error);
-                }
+                setDatasheetUrl(data.DataSheetLink);  
+            } catch (error: any) {
+                console.error('Failed to fetch datasheet info:', error);
+                setError(error.message);
             } finally {
-                if (!isCancelled) {
-                    setIsFetching(false);
-                }
-            }
-        };
-    
-        // Delay the API call
-        const timeoutId = setTimeout(fetchDatasheetInfo, delay);
+                setIsFetching(false);
+                };
+                
+    const debouncedFetchDataSheetInfo = useCallback(
+            debounce(() => {
+                fetchDatasheetInfo();
+                }, 1000),
+                [answer] // Specify 'answer' as a dependency if it's used in fetchDatasheetInfo and its changes should trigger the effect
+            );
+            
+                // UseEffect to call the debounced function
+    useEffect(() => {
+            debouncedFetchDataSheetInfo();
+            
+                    // Cleanup function to cancel the debounced call if the component unmounts
+            return () => {
+                debouncedFetchDataSheetInfo.cancel();
+            };
+                }, [debouncedFetchDataSheetInfo]); // Depend on the debounced function itself
 
-        // Cleanup function to cancel the operation if the component unmounts
-        return () => {
-            isCancelled = true;
-            clearTimeout(timeoutId);
-        };
-
-    }, [answer]); // Removed isFetching from the dependencies
-
-    const [datasheetURL, setDatasheetUrl] = useState('');
     // Assuming parseAnswer can handle datasheetUrl and productName
     const parsedAnswer = useMemo(() => parseAnswer(answer, datasheetURL), [answer, datasheetURL]);
     // ... (the rest of your component code)
@@ -392,4 +391,4 @@ export const Answer = ({
             </Dialog>
         </>
     );
-};
+}};
