@@ -83,7 +83,7 @@ export const Answer = ({
     
     const debouncedFetchDataSheetInfo = useCallback(debounce(() => {
         fetchDatasheetInfo();
-    }, 3000), [fetchDatasheetInfo]);
+    }, 1000), [fetchDatasheetInfo]);
     
     useEffect(() => {
         debouncedFetchDataSheetInfo();
