@@ -1,9 +1,8 @@
-import { FormEvent, useEffect, useMemo, useState, useContext, useCallback } from "react";
+import { FormEvent, useEffect, useMemo, useState, useContext } from "react";
 import { useBoolean } from "@fluentui/react-hooks"
 import { Checkbox, DefaultButton, Dialog, FontIcon, Stack, Text } from "@fluentui/react";
 import DOMPurify from 'dompurify';
 import { AppStateContext } from '../../state/AppProvider';
-import debounce from 'lodash.debounce'
 
 import styles from "./Answer.module.css";
 
@@ -17,71 +16,90 @@ import { ThumbDislike20Filled, ThumbLike20Filled } from "@fluentui/react-icons";
 import { XSSAllowTags } from "../../constants/xssAllowTags";
 
 
-
 interface Props {
     answer: AskResponse;
     onCitationClicked?: (citation: Citation) => void;
 }
 
-const filePathTruncationLimit = 50;
+export const Answer = ({
+    answer,
 
-const initializeAnswerFeedback = (answer: AskResponse): Feedback | undefined => {
-    if (answer.message_id == undefined) return undefined;
-    if (answer.feedback == undefined) return undefined;
-    if (answer.feedback.split(",").length > 1) return Feedback.Negative;
-    if (Object.values(Feedback).includes(answer.feedback as Feedback)) return answer.feedback as Feedback;
-    return Feedback.Neutral;
-};
 
-export const Answer: React.FC<Props> = ({ answer }) => {
-    const [datasheetURL, setDatasheetUrl] = useState('');
-    const [isFetching, setIsFetching] = useState(false);
-    const [error, setError] = useState('');
+}: Props) => {
+    const initializeAnswerFeedback = (answer: AskResponse) => {
+        if (answer.message_id == undefined) return undefined;
+        if (answer.feedback == undefined) return undefined;
+        if (answer.feedback.split(",").length > 1) return Feedback.Negative;
+        if (Object.values(Feedback).includes(answer.feedback)) return answer.feedback;
+        return Feedback.Neutral;
+    }
+
     const [isRefAccordionOpen, { toggle: toggleIsRefAccordionOpen }] = useBoolean(false);
-    const [feedbackState, setFeedbackState] = useState(() => initializeAnswerFeedback(answer));
+    const filePathTruncationLimit = 50;
 
-    const fetchDatasheetInfo = useCallback(async () => {
-        setIsFetching(true);
-        setError('');
     
-        const quartMicroserviceEndpoint = 'https://quartazurefunction.azurewebsites.net/api/call-function';
-    
-        try {
-            const payload = { chat_output: { answer: answer.answer } };
-            const response = await fetch(quartMicroserviceEndpoint, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            });
-    
-            if (!response.ok) {
-                throw new Error(`Failed with status: ${response.status}`);
-            }
-    
-            const data = await response.json();
-            setDatasheetUrl(data.DataSheetLink);
-        } catch (error: any) {
-            console.error('Fetching datasheet info failed:', error);
-            setError('Failed to fetch datasheet info');
-        } finally {
-            setIsFetching(false);
-        }
-    }, [answer]);
 
-    const debouncedFetchDataSheetInfo = useCallback(debounce(fetchDatasheetInfo, 1000), [fetchDatasheetInfo]);
+    const [isFetching, setIsFetching] = useState(false);
+    const [error, setError] = useState(null);
+    const delay = 4500; // Delay in milliseconds, e.g., 3000ms for 3 seconds
     
     useEffect(() => {
-        debouncedFetchDataSheetInfo();
-        return () => {
-            debouncedFetchDataSheetInfo.cancel();
+        const fetchDatasheetInfo = async () => {
+            if (isFetching) return; // Prevent multiple calls
+            setIsFetching(true);
+            setError(null); // Reset error state
+    
+            const azureFunctionUrl = 'https://bw-chatbot.azurewebsites.net/api/DataSheetFunction?';
+    
+            try {
+                const payload = {
+                    chat_output: {
+                        answer: answer.answer // send only the answer text, not the citations
+                    }
+                };
+                const response = await fetch(azureFunctionUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-functions-key': '1O88V7rwF1-x83XR4-NNQLSyWol9E3Tt0rMmrQtQAN7jAzFuNASUxw=='
+                        // Include the Azure Function key if required for security
+                    },
+                    body: JSON.stringify(payload), // send the modified payload
+                });
+    
+                if (!response.ok) {
+                    throw new Error(`Azure Function call failed with status: ${response.status}`);
+                }
+    
+                const data = await response.json();
+                // Assuming your Azure Function returns an object with datasheetUrl and productName
+                setDatasheetUrl(data.DataSheetLink);
+            } catch (error) {
+                console.error('Failed to fetch datasheet info:', error);
+            } finally {
+                setIsFetching(false);
+            }
         };
-    }, [debouncedFetchDataSheetInfo]);
+    
+        // Delay the API call
+        const timeoutId = setTimeout(() => {
+            if (answer) {
+                fetchDatasheetInfo();
+            }
+        }, delay);
+    
+        // Clear the timeout if the component unmounts
+        return () => clearTimeout(timeoutId);
+    
+    }, [answer, isFetching, delay]); // Include isFetching and delay if they are expected to change, otherwise they can be omitted
 
+    const [datasheetURL, setDatasheetUrl] = useState('');
     // Assuming parseAnswer can handle datasheetUrl and productName
     const parsedAnswer = useMemo(() => parseAnswer(answer, datasheetURL), [answer, datasheetURL]);
     // ... (the rest of your component code)
     console.log('DataSheet URL:', datasheetURL);
     const [chevronIsExpanded, setChevronIsExpanded] = useState(isRefAccordionOpen);
+    const [feedbackState, setFeedbackState] = useState(initializeAnswerFeedback(answer));
     const [isFeedbackDialogOpen, setIsFeedbackDialogOpen] = useState(false);
     const [showReportInappropriateFeedback, setShowReportInappropriateFeedback] = useState(false);
     const [negativeFeedbackList, setNegativeFeedbackList] = useState<Feedback[]>([]);
