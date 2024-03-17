@@ -17,73 +17,58 @@ import { ThumbDislike20Filled, ThumbLike20Filled } from "@fluentui/react-icons";
 import { XSSAllowTags } from "../../constants/xssAllowTags";
 
 
+
 interface Props {
     answer: AskResponse;
     onCitationClicked?: (citation: Citation) => void;
 }
 
-export const Answer = ({
-    answer,
+const filePathTruncationLimit = 50;
 
+const initializeAnswerFeedback = (answer: AskResponse): Feedback | undefined => {
+    if (answer.message_id == undefined) return undefined;
+    if (answer.feedback == undefined) return undefined;
+    if (answer.feedback.split(",").length > 1) return Feedback.Negative;
+    if (Object.values(Feedback).includes(answer.feedback as Feedback)) return answer.feedback as Feedback;
+    return Feedback.Neutral;
+};
 
-}: Props) => {
-    const initializeAnswerFeedback = (answer: AskResponse) => {
-        if (answer.message_id == undefined) return undefined;
-        if (answer.feedback == undefined) return undefined;
-        if (answer.feedback.split(",").length > 1) return Feedback.Negative;
-        if (Object.values(Feedback).includes(answer.feedback)) return answer.feedback;
-        return Feedback.Neutral;
-    }
-
-    const [isRefAccordionOpen, { toggle: toggleIsRefAccordionOpen }] = useBoolean(false);
-    const filePathTruncationLimit = 50;
-
-    
-
-    const [isFetching, setIsFetching] = useState(false);
-    const [error, setError] = useState(null);
+export const Answer: React.FC<Props> = ({ answer }) => {
     const [datasheetURL, setDatasheetUrl] = useState('');
+    const [isFetching, setIsFetching] = useState(false);
+    const [error, setError] = useState('');
+    const [isRefAccordionOpen, { toggle: toggleIsRefAccordionOpen }] = useBoolean(false);
+    const [feedbackState, setFeedbackState] = useState(() => initializeAnswerFeedback(answer));
 
-    
-  
     const fetchDatasheetInfo = useCallback(async () => {
-        if (isFetching || !answer) return;
         setIsFetching(true);
-        setError(null);
+        setError('');
     
         const quartMicroserviceEndpoint = 'https://quartazurefunction.azurewebsites.net/api/call-function';
     
         try {
-            const payload = {
-                chat_output: {
-                    answer: answer.answer
-                }
-            };
+            const payload = { chat_output: { answer: answer.answer } };
             const response = await fetch(quartMicroserviceEndpoint, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),
             });
     
             if (!response.ok) {
-                throw new Error(`Azure Function call failed with status: ${response.status}`);
+                throw new Error(`Failed with status: ${response.status}`);
             }
     
             const data = await response.json();
             setDatasheetUrl(data.DataSheetLink);
         } catch (error: any) {
-            console.error('Failed to fetch datasheet info:', error);
-            setError(error.message);
+            console.error('Fetching datasheet info failed:', error);
+            setError('Failed to fetch datasheet info');
         } finally {
             setIsFetching(false);
         }
     }, [answer]);
-    
-    const debouncedFetchDataSheetInfo = useCallback(debounce(() => {
-        fetchDatasheetInfo();
-    }, 1000), [fetchDatasheetInfo]);
+
+    const debouncedFetchDataSheetInfo = useCallback(debounce(fetchDatasheetInfo, 1000), [fetchDatasheetInfo]);
     
     useEffect(() => {
         debouncedFetchDataSheetInfo();
@@ -97,7 +82,6 @@ export const Answer = ({
     // ... (the rest of your component code)
     console.log('DataSheet URL:', datasheetURL);
     const [chevronIsExpanded, setChevronIsExpanded] = useState(isRefAccordionOpen);
-    const [feedbackState, setFeedbackState] = useState(initializeAnswerFeedback(answer));
     const [isFeedbackDialogOpen, setIsFeedbackDialogOpen] = useState(false);
     const [showReportInappropriateFeedback, setShowReportInappropriateFeedback] = useState(false);
     const [negativeFeedbackList, setNegativeFeedbackList] = useState<Feedback[]>([]);
