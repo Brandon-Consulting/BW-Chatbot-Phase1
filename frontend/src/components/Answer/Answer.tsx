@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState, useContext } from "react";
+import { FormEvent, useEffect, useMemo, useState, useContext, useCallback } from "react";
 import { useBoolean } from "@fluentui/react-hooks"
 import { Checkbox, DefaultButton, Dialog, FontIcon, Stack, Text } from "@fluentui/react";
 import DOMPurify from 'dompurify';
@@ -43,64 +43,63 @@ export const Answer = ({
     const [error, setError] = useState(null);
     const delay = 4500; // Delay in milliseconds, e.g., 3000ms for 3 seconds
     
-    useEffect(() => {
-        console.log('Current answer:', answer);
-        let isCancelled = false; //Prevents state update if the compoenents unmoun
-        const fetchDatasheetInfo = async () => {
-            if (isFetching || !answer) return; // Prevent multiple calls
-            setIsFetching(true);
-            setError(null); // Reset error state
+    const fetchDatasheetInfo = useCallback(async () => {
+        if (isFetching || !answer) return; // Prevent multiple calls
+        setIsFetching(true);
+        setError(null); // Reset error state
     
-            const quartMicroserviceEndpoint = 'https://quartazurefunction.azurewebsites.net/api/call-function';
-    
-            try {
-                const payload = {
-                    chat_output: {
-                        answer: answer.answer // send only the answer text, not the citations
-                    }
-                };
-            console.log("Sending payload to Quart microservice:"), JSON.stringify(payload);
-                const response = await fetch(quartMicroserviceEndpoint, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Cache-Control': 'no-cache' //Added cache control
-                        //'x-functions-key': 
-                        // Include the Azure Function key if required for security
-                    },
-                    body: JSON.stringify(payload), // send the modified payload
-                });
-    
-                if (!response.ok) {
-                    throw new Error(`Azure Function call failed with status: ${response.status}`);
-                }
-    
-                const data = await response.json();
-                if (!isCancelled) {
-                // Assuming your Azure Function returns an object with datasheetUrl and productName
-                    setDatasheetUrl(data.DataSheetLink);
-                }
-            } catch (error) {
-                if (!isCancelled) {
-                    console.error('Failed to fetch datasheet info:', error);
-                }
-            } finally {
-                if (!isCancelled) {
-                    setIsFetching(false);
-                }
-            }
+        const quartMicroserviceEndpoint = 'https://quartazurefunction.azurewebsites.net/api/call-function';
+        const payload = {
+            chat_output: {
+                answer: answer.answer, // send only the answer text, not the citations
+            },
+            request_timestamp: new Date().toISOString(), // Append current timestamp
         };
     
-        // Delay the API call
-        const timeoutId = setTimeout(fetchDatasheetInfo, delay);
-
-        // Cleanup function to cancel the operation if the component unmounts
+        console.log("Sending payload to Quart microservice:", JSON.stringify(payload));
+    
+        try {
+            const response = await fetch(quartMicroserviceEndpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Cache-Control': 'no-cache', // Added cache control
+                    // 'x-functions-key': // Include the Azure Function key if required for security
+                },
+                body: JSON.stringify(payload), // send the modified payload
+            });
+    
+            if (!response.ok) {
+                throw new Error(`Azure Function call failed with status: ${response.status}`);
+            }
+    
+            const data = await response.json();
+            // Assuming your Azure Function returns an object with datasheetUrl and productName
+            setDatasheetUrl(data.DataSheetLink);
+        } catch (error) {
+            console.error('Failed to fetch datasheet info:', error);
+        } finally {
+            setIsFetching(false);
+        }
+    }, [answer, isFetching]); // Include all dependencies here
+    
+    useEffect(() => {
+        // This ensures the cleanup and setup logic runs correctly
+        let isCancelled = false; 
+    
+        // Implementing a delay
+        const timeoutId = setTimeout(() => {
+            if (!isCancelled) {
+                fetchDatasheetInfo();
+            }
+        }, delay);
+    
         return () => {
             isCancelled = true;
             clearTimeout(timeoutId);
         };
-
-    }, [answer]); // Removed isFetching from the dependencies
+    }, [fetchDatasheetInfo, delay]); // Add fetchDatasheetInfo as a dependency
+    
 
     const [datasheetURL, setDatasheetUrl] = useState('');
     // Assuming parseAnswer can handle datasheetUrl and productName
