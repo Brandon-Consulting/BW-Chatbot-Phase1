@@ -44,6 +44,7 @@ export const Answer = ({
     const delay = 4500; // Delay in milliseconds, e.g., 3000ms for 3 seconds
     
     useEffect(() => {
+        console.log('Current answer:', answer);
         let isCancelled = false; //Prevents state update if the compoenents unmoun
         const fetchDatasheetInfo = async () => {
             if (isFetching || !answer) return; // Prevent multiple calls
