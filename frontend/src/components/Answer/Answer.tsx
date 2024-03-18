@@ -21,6 +21,15 @@ interface Props {
     answer: AskResponse;
     onCitationClicked?: (citation: Citation) => void;
   }
+  function initializeAnswerFeedback(answer: AskResponse): Feedback | undefined {
+    if (answer.message_id === undefined) return undefined;
+    if (answer.feedback === undefined) return undefined;
+    if (answer.feedback.split(",").length > 1) return Feedback.Negative;
+    if (Object.values(Feedback).includes(answer.feedback as Feedback)) {
+      return answer.feedback as Feedback;
+    }
+    return Feedback.Neutral;
+  }
   
   export const Answer = ({ answer }: Props) => {
     const [datasheetURL, setDatasheetUrl] = useState("");
@@ -29,63 +38,47 @@ interface Props {
     const [isRefAccordionOpen, { toggle: toggleIsRefAccordionOpen }] = useBoolean(false);
   
     // Use useCallback to memoize function to prevent re-creation on every render
-    const fetchDatasheetInfo = useCallback(
-      debounce(async () => {
+    const fetchDatasheetInfo = useCallback(async () => {
         if (!answer) return;
   
         setIsFetching(true);
-        //setError();
-  
-        const quartMicroserviceEndpoint = "https://quartazurefunction.azurewebsites.net/api/call-function";
-        const payload = {
-          chat_output: {
-            answer: answer.answer,
-          },
-          request_timestamp: new Date().toISOString(),
-        };
-  
+
         try {
-          const response = await fetch(quartMicroserviceEndpoint, {
-            method: "POST",
+          const response = await fetch('https://quartazurefunction.azurewebsites.net/api/call-function', {
+            method: 'POST',
             headers: {
-              "Content-Type": "application/json",
-              "Cache-Control": "no-cache",
+              'Content-Type': 'application/json',
+              'Cache-Control': 'no-cache',
             },
-            body: JSON.stringify(payload),
+            body: JSON.stringify({
+              chat_output: {
+                answer: answer.answer,
+              },
+              request_timestamp: new Date().toISOString(),
+            }),
           });
-  
+    
           if (!response.ok) {
             throw new Error(`Azure Function call failed with status: ${response.status}`);
           }
-  
+    
           const data = await response.json();
           setDatasheetUrl(data.DataSheetLink);
         } catch (error) {
-            const message = (error as Error).message;
           console.error("Failed to fetch datasheet info:", error);
-          setError(message);
+          //setError(error.message); // Make sure to handle this state in your UI
         } finally {
           setIsFetching(false);
         }
-      }, 500),
-      [answer]
-    );
+      }, [answer, isFetching]); // Removed debounce, consider including `setDatasheetUrl` if its logic changes based on props/state
+    
+      // Only call the fetch function when the answer changes, and make sure to handle cleanup
+      useEffect(() => {
+        fetchDatasheetInfo();
+    
+        // Cleanup is not needed for fetchDatasheetInfo as there's no ongoing subscription
+      }, [fetchDatasheetInfo]);
   
-    useEffect(() => {
-      fetchDatasheetInfo();
-      // Cleanup function to cancel the debounced call if the component unmounts
-      return () => fetchDatasheetInfo.cancel();
-    }, [fetchDatasheetInfo]);
-  
-function initializeAnswerFeedback(answer: AskResponse): Feedback | undefined {
-        if (answer.message_id === undefined) return undefined;
-        if (answer.feedback === undefined) return undefined;
-        if (answer.feedback.split(",").length > 1) return Feedback.Negative;
-        if (Object.values(Feedback).includes(answer.feedback as Feedback)) {
-          return answer.feedback as Feedback;
-        }
-        return Feedback.Neutral;
-      }
     const parsedAnswer = useMemo(() => parseAnswer(answer, datasheetURL), [answer, datasheetURL]);
     // ... (the rest of your component code)
     console.log('DataSheet URL:', datasheetURL);
