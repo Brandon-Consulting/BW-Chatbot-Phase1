@@ -59,10 +59,12 @@ export const Answer = ({
                         answer: answer.answer // send only the answer text, not the citations
                     }
                 };
+            console.log("Sending payload to Quart microservice:"), JSON.stringify(payload);
                 const response = await fetch(quartMicroserviceEndpoint, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        'Cache-Control': 'no-cache' //Added cache control
                         //'x-functions-key': 
                         // Include the Azure Function key if required for security
                     },
