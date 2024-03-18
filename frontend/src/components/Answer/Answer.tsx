@@ -3,6 +3,7 @@ import { useBoolean } from "@fluentui/react-hooks"
 import { Checkbox, DefaultButton, Dialog, FontIcon, Stack, Text } from "@fluentui/react";
 import DOMPurify from 'dompurify';
 import { AppStateContext } from '../../state/AppProvider';
+import { debounce } from 'lodash-es';
 
 import styles from "./Answer.module.css";
 
@@ -19,90 +20,72 @@ import { XSSAllowTags } from "../../constants/xssAllowTags";
 interface Props {
     answer: AskResponse;
     onCitationClicked?: (citation: Citation) => void;
-}
-
-export const Answer = ({
-    answer,
-
-
-}: Props) => {
-    const initializeAnswerFeedback = (answer: AskResponse) => {
-        if (answer.message_id == undefined) return undefined;
-        if (answer.feedback == undefined) return undefined;
-        if (answer.feedback.split(",").length > 1) return Feedback.Negative;
-        if (Object.values(Feedback).includes(answer.feedback)) return answer.feedback;
-        return Feedback.Neutral;
-    }
-
-    const [isRefAccordionOpen, { toggle: toggleIsRefAccordionOpen }] = useBoolean(false);
-    const filePathTruncationLimit = 50;
-
-    
-
+  }
+  
+  export const Answer = ({ answer }: Props) => {
+    const [datasheetURL, setDatasheetUrl] = useState("");
     const [isFetching, setIsFetching] = useState(false);
-    const [error, setError] = useState(null);
-    const delay = 4500; // Delay in milliseconds, e.g., 3000ms for 3 seconds
-    
-    const fetchDatasheetInfo = useCallback(async () => {
-        if (isFetching || !answer) return; // Prevent multiple calls
+    const [error, setError] = useState("");
+    const [isRefAccordionOpen, { toggle: toggleIsRefAccordionOpen }] = useBoolean(false);
+  
+    // Use useCallback to memoize function to prevent re-creation on every render
+    const fetchDatasheetInfo = useCallback(
+      debounce(async () => {
+        if (!answer) return;
+  
         setIsFetching(true);
-        setError(null); // Reset error state
-    
-        const quartMicroserviceEndpoint = 'https://quartazurefunction.azurewebsites.net/api/call-function';
+        //setError();
+  
+        const quartMicroserviceEndpoint = "https://quartazurefunction.azurewebsites.net/api/call-function";
         const payload = {
-            chat_output: {
-                answer: answer.answer, // send only the answer text, not the citations
-            },
-            request_timestamp: new Date().toISOString(), // Append current timestamp
+          chat_output: {
+            answer: answer.answer,
+          },
+          request_timestamp: new Date().toISOString(),
         };
-    
-        console.log("Sending payload to Quart microservice:", JSON.stringify(payload));
-    
+  
         try {
-            const response = await fetch(quartMicroserviceEndpoint, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Cache-Control': 'no-cache', // Added cache control
-                    // 'x-functions-key': // Include the Azure Function key if required for security
-                },
-                body: JSON.stringify(payload), // send the modified payload
-            });
-    
-            if (!response.ok) {
-                throw new Error(`Azure Function call failed with status: ${response.status}`);
-            }
-    
-            const data = await response.json();
-            // Assuming your Azure Function returns an object with datasheetUrl and productName
-            setDatasheetUrl(data.DataSheetLink);
+          const response = await fetch(quartMicroserviceEndpoint, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Cache-Control": "no-cache",
+            },
+            body: JSON.stringify(payload),
+          });
+  
+          if (!response.ok) {
+            throw new Error(`Azure Function call failed with status: ${response.status}`);
+          }
+  
+          const data = await response.json();
+          setDatasheetUrl(data.DataSheetLink);
         } catch (error) {
-            console.error('Failed to fetch datasheet info:', error);
+            const message = (error as Error).message;
+          console.error("Failed to fetch datasheet info:", error);
+          setError(message);
         } finally {
-            setIsFetching(false);
+          setIsFetching(false);
         }
-    }, [answer, isFetching]); // Include all dependencies here
-    
+      }, 500),
+      [answer]
+    );
+  
     useEffect(() => {
-        // This ensures the cleanup and setup logic runs correctly
-        let isCancelled = false; 
-    
-        // Implementing a delay
-        const timeoutId = setTimeout(() => {
-            if (!isCancelled) {
-                fetchDatasheetInfo();
-            }
-        }, delay);
-    
-        return () => {
-            isCancelled = true;
-            clearTimeout(timeoutId);
-        };
-    }, [fetchDatasheetInfo, delay]); // Add fetchDatasheetInfo as a dependency
-    
-
-    const [datasheetURL, setDatasheetUrl] = useState('');
-    // Assuming parseAnswer can handle datasheetUrl and productName
+      fetchDatasheetInfo();
+      // Cleanup function to cancel the debounced call if the component unmounts
+      return () => fetchDatasheetInfo.cancel();
+    }, [fetchDatasheetInfo]);
+  
+function initializeAnswerFeedback(answer: AskResponse): Feedback | undefined {
+        if (answer.message_id === undefined) return undefined;
+        if (answer.feedback === undefined) return undefined;
+        if (answer.feedback.split(",").length > 1) return Feedback.Negative;
+        if (Object.values(Feedback).includes(answer.feedback as Feedback)) {
+          return answer.feedback as Feedback;
+        }
+        return Feedback.Neutral;
+      }
     const parsedAnswer = useMemo(() => parseAnswer(answer, datasheetURL), [answer, datasheetURL]);
     // ... (the rest of your component code)
     console.log('DataSheet URL:', datasheetURL);
@@ -113,11 +96,11 @@ export const Answer = ({
     const [negativeFeedbackList, setNegativeFeedbackList] = useState<Feedback[]>([]);
     const appStateContext = useContext(AppStateContext)
     const FEEDBACK_ENABLED = appStateContext?.state.frontendSettings?.feedback_enabled && appStateContext?.state.isCosmosDBAvailable?.cosmosDB; 
-    
+
     const handleChevronClick = () => {
         setChevronIsExpanded(!chevronIsExpanded);
         toggleIsRefAccordionOpen();
-      };
+};
 
     useEffect(() => {
         setChevronIsExpanded(isRefAccordionOpen);
@@ -134,7 +117,7 @@ export const Answer = ({
         }
         setFeedbackState(currentFeedbackState)
     }, [appStateContext?.state.feedbackState, feedbackState, answer.message_id]);
-
+    const filePathTruncationLimit = 50;
     const createCitationFilepath = (citation: Citation, index: number, truncate: boolean = false) => {
         let citationFilename = "";
 
@@ -394,4 +377,4 @@ export const Answer = ({
             </Dialog>
         </>
     );
-};
+  };
