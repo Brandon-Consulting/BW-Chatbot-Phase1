@@ -19,73 +19,86 @@ import { XSSAllowTags } from "../../constants/xssAllowTags";
 
 interface Props {
     answer: AskResponse;
-    onCitationClicked?: (citation: Citation) => void;
-  }
-  function initializeAnswerFeedback(answer: AskResponse): Feedback | undefined {
-    if (answer.message_id === undefined) return undefined;
-    if (answer.feedback === undefined) return undefined;
-    if (answer.feedback.split(",").length > 1) return Feedback.Negative;
-    if (Object.values(Feedback).includes(answer.feedback as Feedback)) {
-      return answer.feedback as Feedback;
-    }
-    return Feedback.Neutral;
+    // Remove onCitationClicked if it's not used
   }
   
   export const Answer = ({ answer }: Props) => {
-    const [datasheetURL, setDatasheetUrl] = useState("");
-    const [isFetching, setIsFetching] = useState(false);
-    const [error, setError] = useState("");
+    // Initialization and state definitions
+    const [datasheetURL, setDatasheetUrl] = useState<string>('');
+    const [isFetching, setIsFetching] = useState<boolean>(false);
+    const [error, setError] = useState<string | null>(null);
     const [isRefAccordionOpen, { toggle: toggleIsRefAccordionOpen }] = useBoolean(false);
+    const [callCount, setCallCount] = useState<number>(0);
+    const maxCallAttempts = 4;
+    const delay = 4500; // in milliseconds
+    
+    // Helper function to initialize feedback state
+    const initializeAnswerFeedback = (response: AskResponse) => {
+      if (!response.message_id) return undefined;
+      if (!response.feedback) return undefined;
+      if (response.feedback.split(',').length > 1) return Feedback.Negative;
+      if (Object.values(Feedback).includes(response.feedback as Feedback)) {
+        return response.feedback as Feedback;
+      }
+      return Feedback.Neutral;
+    };
   
+    // State dependent on the answer
+    const [feedbackState, setFeedbackState] = useState<Feedback | undefined>(
+      initializeAnswerFeedback(answer)
+    );
+  
+    // useEffect to fetch datasheet info
     useEffect(() => {
-        if (isFetching || !answer) {
-          return;
-        }
-      
+      if (!answer || isFetching || callCount >= maxCallAttempts) {
+        return;
+      }
+  
+      const fetchData = async () => {
         setIsFetching(true);
-      
-        const fetchData = async () => {
-          try {
-            const response = await fetch('https://quartazurefunction.azurewebsites.net/api/call-function', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Cache-Control': 'no-cache',
+        setError(null);
+  
+        try {
+          const response = await fetch('https://quartazurefunction.azurewebsites.net/api/call-function', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Cache-Control': 'no-cache',
+            },
+            body: JSON.stringify({
+              chat_output: {
+                answer: answer.answer,
               },
-              body: JSON.stringify({
-                chat_output: {
-                  answer: answer.answer,
-                },
-                request_timestamp: new Date().toISOString(),
-              }),
-            });
-      
-            if (!response.ok) {
-              throw new Error(`Azure Function call failed with status: ${response.status}`);
-            }
-      
-            const data = await response.json();
-            setDatasheetUrl(data.DataSheetLink);
-          } catch (error) {
-            console.error("Failed to fetch datasheet info:", error);
-            // Optionally set error state here
-            // setError(error.message);
-          } finally {
-            setIsFetching(false);
+              request_timestamp: new Date().toISOString(),
+            }),
+          });
+  
+          if (!response.ok) {
+            throw new Error(`Azure Function call failed with status: ${response.status}`);
           }
-        };
-      
-        fetchData();
-      
-        // Since `fetchData` is defined inside `useEffect`, it's always up-to-date with current props and state,
-        // so we don't need to include `setIsFetching` or `setDatasheetUrl` in the dependency array.
-      }, [answer]);
+  
+          const data = await response.json();
+          setDatasheetUrl(data.DataSheetLink);
+        } catch (e) {
+          if (e instanceof Error) {
+            console.error("Failed to fetch datasheet info:", e.message);
+            setError(e.message);
+          }
+        } finally {
+          setIsFetching(false);
+          setCallCount(prevCount => prevCount + 1);
+        }
+      };
+  
+      const timeoutId = setTimeout(fetchData, delay);
+      return () => clearTimeout(timeoutId);
+  
+    }, [answer, isFetching, callCount, delay]);
   
     const parsedAnswer = useMemo(() => parseAnswer(answer, datasheetURL), [answer, datasheetURL]);
     // ... (the rest of your component code)
     console.log('DataSheet URL:', datasheetURL);
     const [chevronIsExpanded, setChevronIsExpanded] = useState(isRefAccordionOpen);
-    const [feedbackState, setFeedbackState] = useState(initializeAnswerFeedback(answer));
     const [isFeedbackDialogOpen, setIsFeedbackDialogOpen] = useState(false);
     const [showReportInappropriateFeedback, setShowReportInappropriateFeedback] = useState(false);
     const [negativeFeedbackList, setNegativeFeedbackList] = useState<Feedback[]>([]);
