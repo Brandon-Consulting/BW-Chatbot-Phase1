@@ -37,47 +37,49 @@ interface Props {
     const [error, setError] = useState("");
     const [isRefAccordionOpen, { toggle: toggleIsRefAccordionOpen }] = useBoolean(false);
   
-    // Use useCallback to memoize function to prevent re-creation on every render
-    const fetchDatasheetInfo = useCallback(async () => {
-        if (!answer) return;
-  
-        setIsFetching(true);
-
-        try {
-          const response = await fetch('https://quartazurefunction.azurewebsites.net/api/call-function', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Cache-Control': 'no-cache',
-            },
-            body: JSON.stringify({
-              chat_output: {
-                answer: answer.answer,
-              },
-              request_timestamp: new Date().toISOString(),
-            }),
-          });
-    
-          if (!response.ok) {
-            throw new Error(`Azure Function call failed with status: ${response.status}`);
-          }
-    
-          const data = await response.json();
-          setDatasheetUrl(data.DataSheetLink);
-        } catch (error) {
-          console.error("Failed to fetch datasheet info:", error);
-          //setError(error.message); // Make sure to handle this state in your UI
-        } finally {
-          setIsFetching(false);
+    useEffect(() => {
+        if (isFetching || !answer) {
+          return;
         }
-      }, [answer, isFetching]); // Removed debounce, consider including `setDatasheetUrl` if its logic changes based on props/state
-    
-      // Only call the fetch function when the answer changes, and make sure to handle cleanup
-      useEffect(() => {
-        fetchDatasheetInfo();
-    
-        // Cleanup is not needed for fetchDatasheetInfo as there's no ongoing subscription
-      }, [fetchDatasheetInfo]);
+      
+        setIsFetching(true);
+      
+        const fetchData = async () => {
+          try {
+            const response = await fetch('https://quartazurefunction.azurewebsites.net/api/call-function', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-cache',
+              },
+              body: JSON.stringify({
+                chat_output: {
+                  answer: answer.answer,
+                },
+                request_timestamp: new Date().toISOString(),
+              }),
+            });
+      
+            if (!response.ok) {
+              throw new Error(`Azure Function call failed with status: ${response.status}`);
+            }
+      
+            const data = await response.json();
+            setDatasheetUrl(data.DataSheetLink);
+          } catch (error) {
+            console.error("Failed to fetch datasheet info:", error);
+            // Optionally set error state here
+            // setError(error.message);
+          } finally {
+            setIsFetching(false);
+          }
+        };
+      
+        fetchData();
+      
+        // Since `fetchData` is defined inside `useEffect`, it's always up-to-date with current props and state,
+        // so we don't need to include `setIsFetching` or `setDatasheetUrl` in the dependency array.
+      }, [answer]);
   
     const parsedAnswer = useMemo(() => parseAnswer(answer, datasheetURL), [answer, datasheetURL]);
     // ... (the rest of your component code)
