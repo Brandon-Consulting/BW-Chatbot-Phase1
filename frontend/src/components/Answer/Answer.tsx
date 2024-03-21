@@ -50,9 +50,10 @@ interface Props {
   
     // useEffect to fetch datasheet info
     useEffect(() => {
-      if (!answer || isFetching || callCount >= maxCallAttempts) {
-        return;
-      }
+        // Check if a call attempt should be made
+        const shouldFetchData = answer && !isFetching && callCount < maxCallAttempts;
+    
+        // Fetch datasheet info if conditions are met
   
       const fetchData = async () => {
         setIsFetching(true);
@@ -89,10 +90,10 @@ interface Props {
           setCallCount(prevCount => prevCount + 1);
         }
       };
-  
+      if (shouldFetchData) {
       const timeoutId = setTimeout(fetchData, delay);
       return () => clearTimeout(timeoutId);
-  
+      }
     }, [answer, isFetching, callCount, delay]);
   
     const parsedAnswer = useMemo(() => parseAnswer(answer, datasheetURL), [answer, datasheetURL]);
