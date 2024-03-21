@@ -63,7 +63,7 @@ export const Answer = ({
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'x-functions-key':'1O88V7rwF1-x83XR4-NNQLSyWol9E3Tt0rMmrQtQAN7jAzFuNASUxw=='
+                        'x-functions-key':'ZmV6VvrgeUWSAPknMEhaXPfsawJJ7kyEiplVHQOek0qGAzFuIQoOpg=='
                         // Include the Azure Function key if required for security
                     },
                     body: JSON.stringify(payload), // send the modified payload
