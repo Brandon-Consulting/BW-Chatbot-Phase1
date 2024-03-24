@@ -41,51 +41,48 @@ export const Answer = ({
     const extractAnswerWithoutCitations = (fullAnswerText: string) => {
         const citationIndex = fullAnswerText.indexOf(',"citations"');
         return citationIndex !== -1 ? fullAnswerText.substring(0, citationIndex) : fullAnswerText;
-    };
-
-    useEffect(() => {
+      };
+    
+      useEffect(() => {
+        const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+      
         const fetchDatasheetInfo = async () => {
-            if (!isFetching && answer && answer.answer.trim() !== "") {
-                setIsFetching(true);
-        const delay = (ms:number) => new Promise(resolve => setTimeout(resolve, ms));
-                // Apply a delay to give the API enough time to be ready
-                await delay(3500); 
+          if (!isFetching && answer && answer.answer.trim() !== "") {
+            setIsFetching(true);
+            await delay(3500); // Wait for 3.5 seconds
     
-                try {
-                    // Extract the answer text without citations
-                    const answerWithoutCitations = extractAnswerWithoutCitations(answer.answer);
-                    const payload = { chat_output: { answer: answerWithoutCitations } };
-    
-                    const response = await fetch('/api/DataSheetFunction', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload),
-                    });
-    
-                    if (!response.ok) {
-                        throw new Error(`API call failed with status: ${response.status}`);
-                    }
-    
-                    const data = await response.json();
-                    setDatasheetUrl(data.DataSheetLink);
-                } catch (error: any) {
-                    console.error('Failed to fetch datasheet info:', error);
-                    setError(error.message);
-                } finally {
-                    setIsFetching(false);
-                }
+            try {
+              const answerWithoutCitations = extractAnswerWithoutCitations(answer.answer);
+              const payload = { chat_output: { answer: answerWithoutCitations } };
+      
+              const response = await fetch('https://quartazurefunction.azurewebsites.net/call-apim', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+              });
+      
+              const responseText = await response.text();
+              console.log('Response received:', responseText);
+      
+              if (!response.ok) {
+                throw new Error(`API call failed with status: ${response.status}`);
+              }
+      
+              const data = JSON.parse(responseText);
+              setDatasheetUrl(data.DataSheetLink);
+            } catch (error) {
+              console.error('Failed to fetch datasheet info:', error);
+              setError(error instanceof Error ? error.message : String(error));
+            } finally {
+              setIsFetching(false);
             }
+          }
         };
-    
-        // Run the fetch operation only if the answer has changed and there was no previous error
-        if (!error) {
-            fetchDatasheetInfo();
+      
+        if (answer && answer.answer.trim() !== "") {
+          fetchDatasheetInfo();
         }
-    }, [answer, isFetching, error]); // Add error to the dependency array to avoid refetching after an error
-
-    if (error) {
-        return <div>An error occurred: {error}</div>;
-    }
+      }, [answer]);
 
     // Assuming parseAnswer can handle datasheetUrl and productName
     const parsedAnswer = useMemo(() => parseAnswer(answer, datasheetURL), [answer, datasheetURL]);
@@ -238,7 +235,32 @@ export const Answer = ({
   // For example, you could update the state to show a modal with the citation details.
   console.log(`Citation clicked: ${citation.id}`);
   // ... other logic to handle the click event
-
+  let content;
+  if (error) {
+      // Error content
+      content = (
+          <div className="error-message">
+              An error occurred: {error}
+              {/* You can add additional UI elements here to handle the error */}
+          </div>
+      );
+  } else {
+      // Regular content
+      content = (
+          // The rest of your JSX goes here
+          // For example:
+          <Stack className={styles.answerContainer} tabIndex={0}>
+              {/* ... */}
+              {datasheetURL && (
+                  <p>
+                      Datasheet: <a href={datasheetURL} target="_blank" rel="noopener noreferrer">View Datasheet</a>
+                  </p>
+              )}
+              {/* ... */}
+          </Stack>
+      );
+  }
+    return <>{content}</>
 };
     return (
         <>
