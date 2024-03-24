@@ -41,55 +41,60 @@ export const Answer = ({
     const [answerText, setAnswerText] = useState<string>('');
 
     useEffect(() => {
-      const isAnswerComplete = answer.answer !== "Generating answer" && answer.answer.trim() !== "";
+        // Define the delay function
+        const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
     
-      const fetchDatasheetInfo = async () => {
-        if (isFetching || !isAnswerComplete) return; // Prevent multiple calls and wait for answer completion
-        setIsFetching(true);
-        setError(null);
-
-            // Use the APIM endpoint here
-            const quartServerEndpoint = 'quartazurefunction.azurewebsites.net';
-
+        const fetchDatasheetInfo = async () => {
+          // Only proceed if the answer is not in a 'generating' state
+          if (answer && answer.answer !== "Generating Answer" && !isFetching) {
+            setIsFetching(true);
+            setError(null);
+    
+            // Wait for a specific delay before making the API call, to ensure the answer is ready
+            await delay(3500); // Wait for 1 second (1000 milliseconds)
+    
+            // Now we proceed to make the API call
             try {
-                const payload = {
-                    chat_output: {
-                        answer: answer.answer // send only the answer text, not the citations
-                    }
-                };
-
-                // Ensure that the 'Ocp-Apim-Subscription-Key' header is included with your APIM subscription key
-                const response = await fetch(quartServerEndpoint, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(payload),
-                });
-
-                if (!response.ok) {
-                    throw new Error(`APIM call failed with status: ${response.status}`);
+              const payload = {
+                chat_output: {
+                  answer: answer.answer
                 }
-
-                const data = await response.json();
-                setDatasheetUrl(data.DataSheetLink); // Update the state with the new datasheet URL
+              };
+    
+              const response = await fetch('your-quart-service-endpoint', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  // Other headers here
+                },
+                body: JSON.stringify(payload),
+              });
+    
+              if (!response.ok) {
+                throw new Error(`API call failed with status: ${response.status}`);
+              }
+    
+              const data = await response.json();
+              // Handle your response here
+              console.log(data);
             } catch (error) {
-                console.error('Failed to fetch datasheet info:', error);
-                setError(error instanceof Error ? error.message : String(error));
+              console.error('Failed to fetch datasheet info:', error);
+              setError(error instanceof Error ? error.message : String(error));
             } finally {
-                setIsFetching(false);
+              setIsFetching(false);
             }
+          }
         };
-
-        if (isAnswerComplete) {
-            fetchDatasheetInfo();
-        }
-
+    
+        // Call the function
+        fetchDatasheetInfo();
+    
+        // Cleanup function to cancel the timeout if the component unmounts
         return () => {
-            // Cleanup if necessary
+          // If using setTimeout directly, you would clear it here
         };
-
-    }, [answer, isFetching]); // Depend on the 'answer' prop
+    
+      }, [answer]); // Dependency array
 
  
     // Assuming parseAnswer can handle datasheetUrl and productName
