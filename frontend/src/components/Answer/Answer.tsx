@@ -44,48 +44,49 @@ export const Answer = ({
     };
 
     useEffect(() => {
-        // Delays the execution of a function
-        const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
         const fetchDatasheetInfo = async () => {
             if (!isFetching && answer && answer.answer.trim() !== "") {
                 setIsFetching(true);
-                await delay(3500); // Wait for 3.5 seconds
-
+        const delay = (ms:number) => new Promise(resolve => setTimeout(resolve, ms));
+                // Apply a delay to give the API enough time to be ready
+                await delay(3500); 
+    
                 try {
+                    // Extract the answer text without citations
                     const answerWithoutCitations = extractAnswerWithoutCitations(answer.answer);
                     const payload = { chat_output: { answer: answerWithoutCitations } };
-                    const quartServiceEndpoint = 'https://quartazurefunction.azurewebsites.net/call-apim';
-
-                    const response = await fetch(quartServiceEndpoint, {
+    
+                    const response = await fetch('/api/DataSheetFunction', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload),
                     });
-
+    
                     if (!response.ok) {
                         throw new Error(`API call failed with status: ${response.status}`);
                     }
-
+    
                     const data = await response.json();
                     setDatasheetUrl(data.DataSheetLink);
-                } catch (error) {
-                    // Log error and continue to show chatbot answer without datasheet
+                } catch (error: any) {
                     console.error('Failed to fetch datasheet info:', error);
-                    setError(error instanceof Error ? error.message : String(error));
+                    setError(error.message);
                 } finally {
                     setIsFetching(false);
                 }
             }
         };
-
-        fetchDatasheetInfo();
-    }, [answer]); // Re-run effect if 'answer' changes
+    
+        // Run the fetch operation only if the answer has changed and there was no previous error
+        if (!error) {
+            fetchDatasheetInfo();
+        }
+    }, [answer, isFetching, error]); // Add error to the dependency array to avoid refetching after an error
 
     if (error) {
         return <div>An error occurred: {error}</div>;
     }
-    
+
     // Assuming parseAnswer can handle datasheetUrl and productName
     const parsedAnswer = useMemo(() => parseAnswer(answer, datasheetURL), [answer, datasheetURL]);
     // ... (the rest of your component code)
