@@ -41,45 +41,35 @@ export const Answer = ({
     const [answerText, setAnswerText] = useState<string>('');
 
     useEffect(() => {
-        // Define the delay function
         const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
       
         const fetchDatasheetInfo = async () => {
-          // Check if the answer is in a state that indicates it's still being generated.
           if (!isFetching && answer && answer.answer.trim() !== "") {
             setIsFetching(true);
-            setError(null);
+            console.log('Starting the delay.');
       
-            // Apply the delay
-            console.log('Waiting for 3.5 seconds before making the API call.');
-            await delay(3500); // Wait for 3.5 seconds
-      
-            // Now we proceed to make the API call
-            const payload = {
-              chat_output: {
-                answer: answer.answer // Ensure this matches the structure your backend expects
-              }
-            };
+            await delay(3500);
+            console.log('Finished the delay.');
       
             try {
-              const quartServiceEndpoint = 'your-quart-service-endpoint'; // Replace with your endpoint
-      
-              const response = await fetch(quartServiceEndpoint, {
+              const payload = { chat_output: { answer: answer.answer } };
+              const response = await fetch('your-endpoint', {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
-                  // Include any necessary headers
                 },
                 body: JSON.stringify(payload),
               });
+      
+              const responseText = await response.text(); // Get the full response text
+              console.log('Response received:', responseText);
       
               if (!response.ok) {
                 throw new Error(`API call failed with status: ${response.status}`);
               }
       
-              const data = await response.json();
+              const data = JSON.parse(responseText); // Parse the response text as JSON
               setDatasheetUrl(data.DataSheetLink);
-      
             } catch (error) {
               console.error('Failed to fetch datasheet info:', error);
               setError(error instanceof Error ? error.message : String(error));
@@ -90,14 +80,8 @@ export const Answer = ({
         };
       
         fetchDatasheetInfo();
+      }, [answer]);
       
-        // Add a cleanup function if necessary
-        return () => {
-          // Cleanup logic goes here
-        };
-      
-      }, [answer]); // Dependency array
-
  
     // Assuming parseAnswer can handle datasheetUrl and productName
     const parsedAnswer = useMemo(() => parseAnswer(answer, datasheetURL), [answer, datasheetURL]);
