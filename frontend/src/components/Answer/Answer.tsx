@@ -42,17 +42,17 @@ export const Answer = ({
 
     useEffect(() => {
         // Define the delay function
-        const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-    
+        const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+      
         const fetchDatasheetInfo = async () => {
-          // Only proceed if the answer is not in a 'generating' state
-          if (answer && answer.answer !== "Generating Answer" && !isFetching) {
+          // Only proceed if not currently fetching
+          if (!isFetching) {
             setIsFetching(true);
             setError(null);
-    
-            // Wait for a specific delay before making the API call, to ensure the answer is ready
-            await delay(3500); // Wait for 1 second (1000 milliseconds)
-    
+      
+            // Apply the delay
+            await delay(3500); // Wait for 3.5 seconds
+      
             // Now we proceed to make the API call
             try {
               const payload = {
@@ -60,23 +60,26 @@ export const Answer = ({
                   answer: answer.answer
                 }
               };
-    
-              const response = await fetch('your-quart-service-endpoint', {
+      
+              const quartServiceEndpoint = 'your-quart-service-endpoint'; // Replace with your endpoint
+      
+              const response = await fetch(quartServiceEndpoint, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
-                  // Other headers here
+                  // Include any necessary headers
                 },
                 body: JSON.stringify(payload),
               });
-    
+      
               if (!response.ok) {
                 throw new Error(`API call failed with status: ${response.status}`);
               }
-    
+      
               const data = await response.json();
-              // Handle your response here
-              console.log(data);
+              // Handle your data here
+              setDatasheetUrl(data.DataSheetLink);
+      
             } catch (error) {
               console.error('Failed to fetch datasheet info:', error);
               setError(error instanceof Error ? error.message : String(error));
@@ -85,16 +88,11 @@ export const Answer = ({
             }
           }
         };
-    
-        // Call the function
+      
+        // Trigger the fetch operation with the delay
         fetchDatasheetInfo();
-    
-        // Cleanup function to cancel the timeout if the component unmounts
-        return () => {
-          // If using setTimeout directly, you would clear it here
-        };
-    
-      }, [answer]); // Dependency array
+      
+      }, [answer]); // Depend on the 'answer' prop, remove 'isFetching' if you don't want the effect to re-run when it changes
 
  
     // Assuming parseAnswer can handle datasheetUrl and productName
