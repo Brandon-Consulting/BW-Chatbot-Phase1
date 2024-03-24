@@ -38,11 +38,15 @@ export const Answer = ({
 
     const [datasheetURL, setDatasheetUrl] = useState(''); // Rename this state to follow convention (camelCase)
 
+    const [answerText, setAnswerText] = useState<string>('');
+
     useEffect(() => {
-        const fetchDatasheetInfo = async () => {
-            if (isFetching) return; // Prevent multiple calls
-            setIsFetching(true);
-            setError(null);
+      const isAnswerComplete = answer.answer !== "Generating answer" && answer.answer.trim() !== "";
+    
+      const fetchDatasheetInfo = async () => {
+        if (isFetching || !isAnswerComplete) return; // Prevent multiple calls and wait for answer completion
+        setIsFetching(true);
+        setError(null);
 
             // Use the APIM endpoint here
             const quartServerEndpoint = 'quartazurefunction.azurewebsites.net';
@@ -77,7 +81,7 @@ export const Answer = ({
             }
         };
 
-        if (answer) {
+        if (isAnswerComplete) {
             fetchDatasheetInfo();
         }
 
@@ -85,7 +89,7 @@ export const Answer = ({
             // Cleanup if necessary
         };
 
-    }, [answer]); // Depend on the 'answer' prop
+    }, [answer, isFetching]); // Depend on the 'answer' prop
 
  
     // Assuming parseAnswer can handle datasheetUrl and productName
