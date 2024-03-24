@@ -45,7 +45,7 @@ export const Answer = ({
             setError(null);
 
             // Use the APIM endpoint here
-            const quartServerEndpoint = 'https://your-quart-server-endpoint/call-apim';
+            const quartServerEndpoint = 'quartazurefunction.azurewebsites.net';
 
             try {
                 const payload = {
