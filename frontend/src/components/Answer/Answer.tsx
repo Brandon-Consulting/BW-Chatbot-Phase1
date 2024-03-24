@@ -23,9 +23,11 @@ interface Props {
 
 export const Answer = ({
     answer,
-
-
 }: Props) => {
+    const [isFetching, setIsFetching] = useState(false);
+    const [isRefAccordionOpen, { toggle: toggleIsRefAccordionOpen }] = useBoolean(false);
+    const [error, setError] = useState<string | null>(null);
+    const filePathTruncationLimit = 50;
     const initializeAnswerFeedback = (answer: AskResponse) => {
         if (answer.message_id == undefined) return undefined;
         if (answer.feedback == undefined) return undefined;
@@ -34,50 +36,44 @@ export const Answer = ({
         return Feedback.Neutral;
     }
 
-    const [isRefAccordionOpen, { toggle: toggleIsRefAccordionOpen }] = useBoolean(false);
-    const filePathTruncationLimit = 50;
+    const [datasheetURL, setDatasheetUrl] = useState(''); // Rename this state to follow convention (camelCase)
 
-    
-
-    const [isFetching, setIsFetching] = useState(false);
-    const [error, setError] = useState(null);
-    
     useEffect(() => {
-        // Call to Azure Function should go here
         const fetchDatasheetInfo = async () => {
-            if (isFetching) return; //Prevent muliple calls
+            if (isFetching) return; // Prevent multiple calls
             setIsFetching(true);
-            setError(null); // Reset error state
-            // Replace this URL with the actual endpoint of your Azure Function
-            const azureFunctionUrl = 'https://bw-chatbot.azurewebsites.net/api/DataSheetFunction?';
-            
+            setError(null);
+
+            // Use the APIM endpoint here
+            const quartServerEndpoint = 'https://your-quart-server-endpoint/call-apim';
+
             try {
-                // Assuming `answer` is an object with `answer` and `citations` properties
-                // and you only want to send the `answer` part.
                 const payload = {
-                 chat_output: {
-                    answer: answer.answer // send only the answer text, not the citations
-        }
-    };
-                const response = await fetch(azureFunctionUrl, {
+                    chat_output: {
+                        answer: answer.answer // send only the answer text, not the citations
+                    }
+                };
+
+                // Ensure that the 'Ocp-Apim-Subscription-Key' header is included with your APIM subscription key
+                const response = await fetch(quartServerEndpoint, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'x-functions-key':'ZmV6VvrgeUWSAPknMEhaXPfsawJJ7kyEiplVHQOek0qGAzFuIQoOpg=='
-                        // Include the Azure Function key if required for security
                     },
-                    body: JSON.stringify(payload), // send the modified payload
+                    body: JSON.stringify(payload),
                 });
 
                 if (!response.ok) {
-                    throw new Error(`Azure Function call failed with status: ${response.status}`);
+                    throw new Error(`APIM call failed with status: ${response.status}`);
                 }
 
                 const data = await response.json();
-                // Assuming your Azure Function returns an object with datasheetUrl and productName
-                setDatasheetUrl(data.DataSheetLink);
+                setDatasheetUrl(data.DataSheetLink); // Update the state with the new datasheet URL
             } catch (error) {
                 console.error('Failed to fetch datasheet info:', error);
+                setError(error instanceof Error ? error.message : String(error));
+            } finally {
+                setIsFetching(false);
             }
         };
 
@@ -85,11 +81,13 @@ export const Answer = ({
             fetchDatasheetInfo();
         }
 
-        return () => {};
+        return () => {
+            // Cleanup if necessary
+        };
 
-    }, [answer]);
+    }, [answer]); // Depend on the 'answer' prop
 
-    const [datasheetURL, setDatasheetUrl] = useState('');
+ 
     // Assuming parseAnswer can handle datasheetUrl and productName
     const parsedAnswer = useMemo(() => parseAnswer(answer, datasheetURL), [answer, datasheetURL]);
     // ... (the rest of your component code)
