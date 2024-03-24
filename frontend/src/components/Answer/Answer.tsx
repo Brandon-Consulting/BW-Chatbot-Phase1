@@ -38,70 +38,54 @@ export const Answer = ({
 
     const [datasheetURL, setDatasheetUrl] = useState(''); // Rename this state to follow convention (camelCase)
 
-    const [answerText, setAnswerText] = useState<string>('');
+    const extractAnswerWithoutCitations = (fullAnswerText: string) => {
+        const citationIndex = fullAnswerText.indexOf(',"citations"');
+        return citationIndex !== -1 ? fullAnswerText.substring(0, citationIndex) : fullAnswerText;
+    };
 
     useEffect(() => {
-        // Define the delay function
+        // Delays the execution of a function
         const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-      
+
         const fetchDatasheetInfo = async () => {
             if (!isFetching && answer && answer.answer.trim() !== "") {
-              setIsFetching(true);
-              setError(null);
-          
-              // Extract only the answer text, excluding the citations
-              const answerOnly = extractAnswerWithoutCitations(answer.answer);
-          
-              await delay(3500); // Wait for 3.5 seconds
-          
-              try {
-                const payload = { chat_output: { answer: answerOnly } };
-                const quartServiceEndpoint = 'https://quartazurefunction.azurewebsites.net/call-apim';
-          
-                const response = await fetch(quartServiceEndpoint, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify(payload),
-                });
-          
-                const responseText = await response.text(); // Get the full response text
-                console.log('Response received:', responseText);
-          
-                if (!response.ok) {
-                  throw new Error(`API call failed with status: ${response.status}`);
-                }
-          
-                const data = JSON.parse(responseText); // Parse the response text as JSON
-                setDatasheetUrl(data.DataSheetLink);
-              } catch (error) {
-                console.error('Failed to fetch datasheet info:', error);
-                setError(error instanceof Error ? error.message : String(error));
-              } finally {
-                setIsFetching(false);
-              }
-            }
-          };
-          
-          function extractAnswerWithoutCitations(fullAnswerText: string) {
-            // Check if the "citations" marker exists in the answer
-            const citationStartIndex = fullAnswerText.indexOf(',"citations"');
-            if (citationStartIndex !== -1) {
-              // Extract and return only the part of the answer before "citations"
-              return fullAnswerText.substring(0, citationStartIndex).trim();
-            }
-            // Return the full answer text if no "citations" marker is found
-            return fullAnswerText;
-          }
-          
-      
-        // Trigger the fetch operation with the delay
-        fetchDatasheetInfo();
-      
-      }, [answer]); // Depend on the 'answer' prop, remove 'isFetching' if you don't want the effect to re-run when it changes
+                setIsFetching(true);
+                await delay(3500); // Wait for 3.5 seconds
 
- 
+                try {
+                    const answerWithoutCitations = extractAnswerWithoutCitations(answer.answer);
+                    const payload = { chat_output: { answer: answerWithoutCitations } };
+                    const quartServiceEndpoint = 'https://quartazurefunction.azurewebsites.net/call-apim';
+
+                    const response = await fetch(quartServiceEndpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload),
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`API call failed with status: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    setDatasheetUrl(data.DataSheetLink);
+                } catch (error) {
+                    // Log error and continue to show chatbot answer without datasheet
+                    console.error('Failed to fetch datasheet info:', error);
+                    setError(error instanceof Error ? error.message : String(error));
+                } finally {
+                    setIsFetching(false);
+                }
+            }
+        };
+
+        fetchDatasheetInfo();
+    }, [answer]); // Re-run effect if 'answer' changes
+
+    if (error) {
+        return <div>An error occurred: {error}</div>;
+    }
+    
     // Assuming parseAnswer can handle datasheetUrl and productName
     const parsedAnswer = useMemo(() => parseAnswer(answer, datasheetURL), [answer, datasheetURL]);
     // ... (the rest of your component code)
