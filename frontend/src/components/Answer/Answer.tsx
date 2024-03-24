@@ -45,22 +45,23 @@ export const Answer = ({
         const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
       
         const fetchDatasheetInfo = async () => {
-          // Only proceed if not currently fetching
-          if (!isFetching) {
+          // Check if the answer is in a state that indicates it's still being generated.
+          if (!isFetching && answer && answer.answer.trim() !== "") {
             setIsFetching(true);
             setError(null);
       
             // Apply the delay
+            console.log('Waiting for 3.5 seconds before making the API call.');
             await delay(3500); // Wait for 3.5 seconds
       
             // Now we proceed to make the API call
-            try {
-              const payload = {
-                chat_output: {
-                  answer: answer.answer
-                }
-              };
+            const payload = {
+              chat_output: {
+                answer: answer.answer // Ensure this matches the structure your backend expects
+              }
+            };
       
+            try {
               const quartServiceEndpoint = 'your-quart-service-endpoint'; // Replace with your endpoint
       
               const response = await fetch(quartServiceEndpoint, {
@@ -77,7 +78,6 @@ export const Answer = ({
               }
       
               const data = await response.json();
-              // Handle your data here
               setDatasheetUrl(data.DataSheetLink);
       
             } catch (error) {
@@ -89,10 +89,14 @@ export const Answer = ({
           }
         };
       
-        // Trigger the fetch operation with the delay
         fetchDatasheetInfo();
       
-      }, [answer]); // Depend on the 'answer' prop, remove 'isFetching' if you don't want the effect to re-run when it changes
+        // Add a cleanup function if necessary
+        return () => {
+          // Cleanup logic goes here
+        };
+      
+      }, [answer]); // Dependency array
 
  
     // Assuming parseAnswer can handle datasheetUrl and productName
