@@ -41,47 +41,51 @@ export const Answer = ({
     const [answerText, setAnswerText] = useState<string>('');
 
     useEffect(() => {
+        // Define the delay function
         const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
       
         const fetchDatasheetInfo = async () => {
-          if (!isFetching && answer && answer.answer.trim() !== "") {
-            setIsFetching(true);
-            console.log('Starting the delay.');
-      
-            await delay(3500);
-            console.log('Finished the delay.');
-      
-            try {
-              const payload = { chat_output: { answer: answer.answer } };
-              const response = await fetch('your-endpoint', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(payload),
-              });
-      
-              const responseText = await response.text(); // Get the full response text
-              console.log('Response received:', responseText);
-      
-              if (!response.ok) {
-                throw new Error(`API call failed with status: ${response.status}`);
+            if (!isFetching && answer && answer.answer.trim() !== "") {
+              setIsFetching(true);
+              setError(null);
+          
+              await delay(3500); // Wait for 3.5 seconds
+          
+              try {
+                const payload = { chat_output: { answer: answer.answer } };
+                const quartServiceEndpoint = 'https://quartazurefunction.azurewebsites.net/call-apim';
+          
+                const response = await fetch(quartServiceEndpoint, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify(payload),
+                });
+          
+                const responseText = await response.text(); // Get the full response text
+                console.log('Response received:', responseText);
+          
+                if (!response.ok) {
+                  throw new Error(`API call failed with status: ${response.status}`);
+                }
+          
+                const data = JSON.parse(responseText); // Parse the response text as JSON
+                setDatasheetUrl(data.DataSheetLink);
+              } catch (error) {
+                console.error('Failed to fetch datasheet info:', error);
+                setError(error instanceof Error ? error.message : String(error));
+              } finally {
+                setIsFetching(false);
               }
-      
-              const data = JSON.parse(responseText); // Parse the response text as JSON
-              setDatasheetUrl(data.DataSheetLink);
-            } catch (error) {
-              console.error('Failed to fetch datasheet info:', error);
-              setError(error instanceof Error ? error.message : String(error));
-            } finally {
-              setIsFetching(false);
             }
-          }
-        };
+          };
       
+        // Trigger the fetch operation with the delay
         fetchDatasheetInfo();
-      }, [answer]);
       
+      }, [answer]); // Depend on the 'answer' prop, remove 'isFetching' if you don't want the effect to re-run when it changes
+
  
     // Assuming parseAnswer can handle datasheetUrl and productName
     const parsedAnswer = useMemo(() => parseAnswer(answer, datasheetURL), [answer, datasheetURL]);
