@@ -49,10 +49,13 @@ export const Answer = ({
               setIsFetching(true);
               setError(null);
           
+              // Extract only the answer text, excluding the citations
+              const answerOnly = extractAnswerWithoutCitations(answer.answer);
+          
               await delay(3500); // Wait for 3.5 seconds
           
               try {
-                const payload = { chat_output: { answer: answer.answer } };
+                const payload = { chat_output: { answer: answerOnly } };
                 const quartServiceEndpoint = 'https://quartazurefunction.azurewebsites.net/call-apim';
           
                 const response = await fetch(quartServiceEndpoint, {
@@ -80,6 +83,18 @@ export const Answer = ({
               }
             }
           };
+          
+          function extractAnswerWithoutCitations(fullAnswerText: string) {
+            // Check if the "citations" marker exists in the answer
+            const citationStartIndex = fullAnswerText.indexOf(',"citations"');
+            if (citationStartIndex !== -1) {
+              // Extract and return only the part of the answer before "citations"
+              return fullAnswerText.substring(0, citationStartIndex).trim();
+            }
+            // Return the full answer text if no "citations" marker is found
+            return fullAnswerText;
+          }
+          
       
         // Trigger the fetch operation with the delay
         fetchDatasheetInfo();
