@@ -49,10 +49,11 @@ export const Answer = ({ answer }: Props) => {
 
 try {  
     setIsFetching(true);
-
+    console.log('Delay starting');
     //Wait for 4 seconds before making the API call 
     await delay(4000);
-
+    console.log('Delay finished');
+    
     const answerWithoutCitations = extractAnswerWithoutCitations(answer.answer);
     const payload = { chat_output: { answer: answerWithoutCitations } };
 
