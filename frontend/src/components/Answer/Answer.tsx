@@ -37,6 +37,9 @@ export const Answer = ({
     }
 
     const [datasheetURL, setDatasheetUrl] = useState(''); // Rename this state to follow convention (camelCase)
+    const [retry, setRetry] = useState(false);
+    const [retryCount, setRetryCount] = useState(0);
+    const maxRetries = 3; // Set a maximum number of retries
 
     const extractAnswerWithoutCitations = (fullAnswerText: string) => {
         const citationIndex = fullAnswerText.indexOf(',"citations"');
@@ -47,8 +50,7 @@ export const Answer = ({
         const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
       
         const fetchDatasheetInfo = async () => {
-          if (!isFetching && answer && answer.answer.trim() !== "") {
-            setIsFetching(true);
+            if (!answer || !answer.answer.trim()) return;
             await delay(3500); // Wait for 3.5 seconds
     
             try {
@@ -70,19 +72,33 @@ export const Answer = ({
       
               const data = JSON.parse(responseText);
               setDatasheetUrl(data.DataSheetLink);
-            } catch (error) {
-              console.error('Failed to fetch datasheet info:', error);
-              setError(error instanceof Error ? error.message : String(error));
+              setRetryCount(0);
+            } catch (err: any) {
+                console.error('Failed to fetch datasheet info:', err);
+                setError(err.message || 'An unexpected error occurred');
+
+                if (retryCount < maxRetries) {
+                    setRetry(true); // Trigger a retry
+                }
             } finally {
-              setIsFetching(false);
+                setIsFetching(false);
             }
-          }
         };
-      
-        if (answer && answer.answer.trim() !== "") {
-          fetchDatasheetInfo();
+
+        fetchDatasheetInfo();
+    }, [answer, retry]); // Retry when the 'retry' flag changes
+
+    useEffect(() => {
+        if (retry) {
+            const timer = setTimeout(() => {
+                setRetryCount((prevRetryCount) => prevRetryCount + 1);
+                setRetry(false); // Reset the retry flag for the next attempt
+            }, 3000); // Wait 3 seconds before retrying
+
+            // Clean up the timeout if the component unmounts
+            return () => clearTimeout(timer);
         }
-      }, [answer]);
+    }, [retry]);
 
     // Assuming parseAnswer can handle datasheetUrl and productName
     const parsedAnswer = useMemo(() => parseAnswer(answer, datasheetURL), [answer, datasheetURL]);
