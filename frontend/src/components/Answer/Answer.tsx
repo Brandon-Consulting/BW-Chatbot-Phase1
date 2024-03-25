@@ -39,7 +39,7 @@ export const Answer = ({
     const [datasheetURL, setDatasheetUrl] = useState(''); // Rename this state to follow convention (camelCase)
     const [retry, setRetry] = useState(false);
     const [retryCount, setRetryCount] = useState(0);
-    const maxRetries = 3; // Set a maximum number of retries
+    const maxRetries = 5; // Set a maximum number of retries
 
     const extractAnswerWithoutCitations = (fullAnswerText: string) => {
         const citationIndex = fullAnswerText.indexOf(',"citations"');
