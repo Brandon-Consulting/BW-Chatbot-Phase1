@@ -15,90 +15,78 @@ import supersub from 'remark-supersub'
 import { ThumbDislike20Filled, ThumbLike20Filled } from "@fluentui/react-icons";
 import { XSSAllowTags } from "../../constants/xssAllowTags";
 
+const maxRetries = 3; // Set your maximum retries limit
 
 interface Props {
-    answer: AskResponse;
-    onCitationClicked?: (citation: Citation) => void;
+  answer: AskResponse;
+  onCitationClicked?: (citation: Citation) => void; // Define the type for Citation
 }
 
-export const Answer = ({
-    answer,
-}: Props) => {
-    const [isFetching, setIsFetching] = useState(false);
-    const [isRefAccordionOpen, { toggle: toggleIsRefAccordionOpen }] = useBoolean(false);
-    const [error, setError] = useState<string | null>(null);
-    const filePathTruncationLimit = 50;
-    const initializeAnswerFeedback = (answer: AskResponse) => {
-        if (answer.message_id == undefined) return undefined;
-        if (answer.feedback == undefined) return undefined;
-        if (answer.feedback.split(",").length > 1) return Feedback.Negative;
-        if (Object.values(Feedback).includes(answer.feedback)) return answer.feedback;
-        return Feedback.Neutral;
+export const Answer = ({ answer }: Props) => {
+  const [isFetching, setIsFetching] = useState(false);
+  const [isRefAccordionOpen, { toggle: toggleIsRefAccordionOpen }] = useBoolean(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [shouldRetry, setShouldRetry] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const filePathTruncationLimit = 50;
+  const initializeAnswerFeedback = (answer: AskResponse) => {
+      if (answer.message_id == undefined) return undefined;
+      if (answer.feedback == undefined) return undefined;
+      if (answer.feedback.split(",").length > 1) return Feedback.Negative;
+      if (Object.values(Feedback).includes(answer.feedback)) return answer.feedback;
+      return Feedback.Neutral;
+  }
+
+  const [datasheetURL, setDatasheetUrl] = useState<string | any>(null);
+
+  // Function to extract answer text without citations
+  const extractAnswerWithoutCitations = (fullAnswerText: string) => {
+    const citationIndex = fullAnswerText.indexOf(',"citations"');
+    return citationIndex !== -1 ? fullAnswerText.substring(0, citationIndex) : fullAnswerText;
+  };
+
+  // Function to fetch datasheet information
+  const fetchDatasheetInfo = async () => {
+    setIsFetching(true);
+
+    try {
+      const answerWithoutCitations = extractAnswerWithoutCitations(answer.answer);
+      const payload = { chat_output: { answer: answerWithoutCitations } };
+
+      const response = await fetch('https://quartazurefunction.azurewebsites.net/call-apim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error(`API call failed with status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setDatasheetUrl(data.DataSheetLink);
+    } catch (err: any) {
+      console.error('Failed to fetch datasheet info:', err);
+      setError(err.message || 'An unexpected error occurred');
+    } finally {
+      setIsFetching(false);
     }
+  };
 
-    const [datasheetURL, setDatasheetUrl] = useState(''); // Rename this state to follow convention (camelCase)
-    const [retry, setRetry] = useState(false);
-    const [retryCount, setRetryCount] = useState(0);
-    const maxRetries = 5; // Set a maximum number of retries
+  // Effect to manage retries
+  useEffect(() => {
+    if (retryCount < maxRetries && answer && answer.answer.trim()) {
+      const timerId = setTimeout(fetchDatasheetInfo, 3500); // Set delay as needed
+      return () => clearTimeout(timerId); // Cleanup timeout
+    }
+  }, [retryCount, answer]);
 
-    const extractAnswerWithoutCitations = (fullAnswerText: string) => {
-        const citationIndex = fullAnswerText.indexOf(',"citations"');
-        return citationIndex !== -1 ? fullAnswerText.substring(0, citationIndex) : fullAnswerText;
-      };
-    
-      useEffect(() => {
-        const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-      
-        const fetchDatasheetInfo = async () => {
-            if (!answer || !answer.answer.trim()) return;
-            await delay(3500); // Wait for 3.5 seconds
-    
-            try {
-              const answerWithoutCitations = extractAnswerWithoutCitations(answer.answer);
-              const payload = { chat_output: { answer: answerWithoutCitations } };
-      
-              const response = await fetch('https://quartazurefunction.azurewebsites.net/call-apim', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-              });
-      
-              const responseText = await response.text();
-              console.log('Response received:', responseText);
-      
-              if (!response.ok) {
-                throw new Error(`API call failed with status: ${response.status}`);
-              }
-      
-              const data = JSON.parse(responseText);
-              setDatasheetUrl(data.DataSheetLink);
-              setRetryCount(0);
-            } catch (err: any) {
-                console.error('Failed to fetch datasheet info:', err);
-                setError(err.message || 'An unexpected error occurred');
-
-                if (retryCount < maxRetries) {
-                    setRetry(true); // Trigger a retry
-                }
-            } finally {
-                setIsFetching(false);
-            }
-        };
-
-        fetchDatasheetInfo();
-    }, [answer, retry]); // Retry when the 'retry' flag changes
-
-    useEffect(() => {
-        if (retry) {
-            const timer = setTimeout(() => {
-                setRetryCount((prevRetryCount) => prevRetryCount + 1);
-                setRetry(false); // Reset the retry flag for the next attempt
-            }, 3000); // Wait 3 seconds before retrying
-
-            // Clean up the timeout if the component unmounts
-            return () => clearTimeout(timer);
-        }
-    }, [retry]);
+  // Effect to initiate the first fetch
+  useEffect(() => {
+    if (answer && answer.answer.trim()) {
+      fetchDatasheetInfo();
+    }
+  }, [answer]);
 
     // Assuming parseAnswer can handle datasheetUrl and productName
     const parsedAnswer = useMemo(() => parseAnswer(answer, datasheetURL), [answer, datasheetURL]);
@@ -253,13 +241,17 @@ export const Answer = ({
   // ... other logic to handle the click event
   let content;
   if (error) {
-      // Error content
       content = (
-          <div className="error-message">
-              An error occurred: {error}
-              {/* You can add additional UI elements here to handle the error */}
-          </div>
+          <div className="error-message">An error occurred: {error}</div>
       );
+      if (retryCount < maxRetries) {
+          content = (
+              <div>
+                  <div className="error-message">An error occurred: {error}</div>
+                  <button onClick={() => setRetryCount(prev => prev + 1)}>Retry</button>
+              </div>
+          );
+      }
   } else {
       // Regular content
       content = (
@@ -276,7 +268,7 @@ export const Answer = ({
           </Stack>
       );
   }
-    return <>{content}</>
+    return <>{content}</>;
 };
     return (
         <>
