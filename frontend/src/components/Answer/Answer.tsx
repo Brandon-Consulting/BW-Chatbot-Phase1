@@ -28,6 +28,7 @@ export const Answer = ({ answer }: Props) => {
   const [error, setError] = useState<string | null>(null);
   const [isRefAccordionOpen, { toggle: toggleIsRefAccordionOpen }] = useBoolean(false);
   const filePathTruncationLimit = 50;
+  const [isFetching, setIsFetching] = useState(false);
   const initializeAnswerFeedback = (answer: AskResponse) => {
       if (answer.message_id == undefined) return undefined;
       if (answer.feedback == undefined) return undefined;
@@ -41,13 +42,21 @@ export const Answer = ({ answer }: Props) => {
     return citationIndex !== -1 ? fullAnswerText.substring(0, citationIndex) : fullAnswerText;
   };
 
+  const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
   const fetchDatasheetInfo = async () => {
-    setError(null); // Reset the error before attempting to fetch
+    if (!answer || !answer.answer.trim()) return;
+
+try {  
+    setIsFetching(true);
+
+    //Wait for 4 seconds before making the API call 
+    await delay(4000);
+
     const answerWithoutCitations = extractAnswerWithoutCitations(answer.answer);
     const payload = { chat_output: { answer: answerWithoutCitations } };
 
-    try {
-      const response = await fetch('https://quartazurefunction.azurewebsites.net/call-apim', {
+    const response = await fetch('https://quartazurefunction.azurewebsites.net/call-apim', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -67,6 +76,8 @@ export const Answer = ({ answer }: Props) => {
           setRetryCount(retryCount + 1); // Increment retry count and trigger a retry
         }, 3000); // Delay before retry
       }
+    } finally {
+        setIsFetching(false);
     }
   };
 
@@ -75,7 +86,7 @@ export const Answer = ({ answer }: Props) => {
     if (answer && answer.answer.trim()) {
       fetchDatasheetInfo();
     }
-  }, [answer, retryCount]); // Retry on answer change or retryCount increment
+  }, [answer]); // Retry on answer change or retryCount increment
 
   const chatbotResponse = answer.answer; // Use your method to parse and display the response
 
