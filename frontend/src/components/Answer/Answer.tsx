@@ -19,15 +19,14 @@ const maxRetries = 3; // Set your maximum retries limit
 
 interface Props {
   answer: AskResponse;
-  onCitationClicked?: (citation: Citation) => void; // Define the type for Citation
+  onCitationClicked?: (citation: Citation) => void;
 }
 
 export const Answer = ({ answer }: Props) => {
-  const [isFetching, setIsFetching] = useState(false);
-  const [isRefAccordionOpen, { toggle: toggleIsRefAccordionOpen }] = useBoolean(false);
+  const [datasheetURL, setDatasheetUrl] = useState<string>('');
   const [retryCount, setRetryCount] = useState(0);
-  const [shouldRetry, setShouldRetry] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isRefAccordionOpen, { toggle: toggleIsRefAccordionOpen }] = useBoolean(false);
   const filePathTruncationLimit = 50;
   const initializeAnswerFeedback = (answer: AskResponse) => {
       if (answer.message_id == undefined) return undefined;
@@ -37,22 +36,17 @@ export const Answer = ({ answer }: Props) => {
       return Feedback.Neutral;
   }
 
-  const [datasheetURL, setDatasheetUrl] = useState<string | any>(null);
-
-  // Function to extract answer text without citations
   const extractAnswerWithoutCitations = (fullAnswerText: string) => {
     const citationIndex = fullAnswerText.indexOf(',"citations"');
     return citationIndex !== -1 ? fullAnswerText.substring(0, citationIndex) : fullAnswerText;
   };
 
-  // Function to fetch datasheet information
   const fetchDatasheetInfo = async () => {
-    setIsFetching(true);
+    setError(null); // Reset the error before attempting to fetch
+    const answerWithoutCitations = extractAnswerWithoutCitations(answer.answer);
+    const payload = { chat_output: { answer: answerWithoutCitations } };
 
     try {
-      const answerWithoutCitations = extractAnswerWithoutCitations(answer.answer);
-      const payload = { chat_output: { answer: answerWithoutCitations } };
-
       const response = await fetch('https://quartazurefunction.azurewebsites.net/call-apim', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -65,28 +59,25 @@ export const Answer = ({ answer }: Props) => {
 
       const data = await response.json();
       setDatasheetUrl(data.DataSheetLink);
+      setRetryCount(0); // Reset retry count after a successful fetch
     } catch (err: any) {
-      console.error('Failed to fetch datasheet info:', err);
       setError(err.message || 'An unexpected error occurred');
-    } finally {
-      setIsFetching(false);
+      if (retryCount < maxRetries) {
+        setTimeout(() => {
+          setRetryCount(retryCount + 1); // Increment retry count and trigger a retry
+        }, 3000); // Delay before retry
+      }
     }
   };
 
-  // Effect to manage retries
-  useEffect(() => {
-    if (retryCount < maxRetries && answer && answer.answer.trim()) {
-      const timerId = setTimeout(fetchDatasheetInfo, 3500); // Set delay as needed
-      return () => clearTimeout(timerId); // Cleanup timeout
-    }
-  }, [retryCount, answer]);
-
-  // Effect to initiate the first fetch
+  // Trigger the datasheet fetch only when answer is available and has changed
   useEffect(() => {
     if (answer && answer.answer.trim()) {
       fetchDatasheetInfo();
     }
-  }, [answer]);
+  }, [answer, retryCount]); // Retry on answer change or retryCount increment
+
+  const chatbotResponse = answer.answer; // Use your method to parse and display the response
 
     // Assuming parseAnswer can handle datasheetUrl and productName
     const parsedAnswer = useMemo(() => parseAnswer(answer, datasheetURL), [answer, datasheetURL]);
@@ -239,137 +230,94 @@ export const Answer = ({ answer }: Props) => {
   // For example, you could update the state to show a modal with the citation details.
   console.log(`Citation clicked: ${citation.id}`);
   // ... other logic to handle the click event
-  let content;
-  if (error) {
-      content = (
-          <div className="error-message">An error occurred: {error}</div>
-      );
-      if (retryCount < maxRetries) {
-          content = (
-              <div>
-                  <div className="error-message">An error occurred: {error}</div>
-                  <button onClick={() => setRetryCount(prev => prev + 1)}>Retry</button>
-              </div>
-          );
-      }
-  } else {
-      // Regular content
-      content = (
-          // The rest of your JSX goes here
-          // For example:
-          <Stack className={styles.answerContainer} tabIndex={0}>
-              {/* ... */}
-              {datasheetURL && (
-                  <p>
-                      Datasheet: <a href={datasheetURL} target="_blank" rel="noopener noreferrer">View Datasheet</a>
-                  </p>
-              )}
-              {/* ... */}
-          </Stack>
-      );
-  }
-    return <>{content}</>;
-};
-    return (
-        <>
-            <Stack className={styles.answerContainer} tabIndex={0}>
-                
-                <Stack.Item>
-                    <Stack horizontal grow>
-                        <Stack.Item grow>
-                            <ReactMarkdown
-                                linkTarget="_blank"
-                                remarkPlugins={[remarkGfm, supersub]}
-                                children={DOMPurify.sanitize(parsedAnswer.markdownFormatText, {ALLOWED_TAGS: XSSAllowTags})}
-                                className={styles.answerText}
-                            />
-                           
-                             {datasheetURL && (
-                                <p>
-                                    Datasheet: <a href={datasheetURL} target="_blank" rel="noopener noreferrer"></a>
-                                </p>
-                            )}
-                            
-                        </Stack.Item>
-                        <Stack.Item className={styles.answerHeader}>
-                            {FEEDBACK_ENABLED && answer.message_id !== undefined && <Stack horizontal horizontalAlign="space-between">
-                                <ThumbLike20Filled
-                                    aria-hidden="false"
-                                    aria-label="Like this response"
-                                    onClick={() => onLikeResponseClicked()}
-                                    style={feedbackState === Feedback.Positive || appStateContext?.state.feedbackState[answer.message_id] === Feedback.Positive ? 
-                                        { color: "darkgreen", cursor: "pointer" } : 
-                                        { color: "slategray", cursor: "pointer" }}
-                                />
-                                <ThumbDislike20Filled
-                                    aria-hidden="false"
-                                    aria-label="Dislike this response"
-                                    onClick={() => onDislikeResponseClicked()}
-                                    style={(feedbackState !== Feedback.Positive && feedbackState !== Feedback.Neutral && feedbackState !== undefined) ? 
-                                        { color: "darkred", cursor: "pointer" } : 
-                                        { color: "slategray", cursor: "pointer" }}
-                                />
-                            </Stack>}
-                        </Stack.Item>
-                    </Stack>
-                    
-                </Stack.Item>
-                
-                <Stack horizontal className={styles.answerFooter}>
-                {!!parsedAnswer.citations.length && (
-                    <Stack.Item
-                        onKeyDown={e => e.key === "Enter" || e.key === " " ? toggleIsRefAccordionOpen() : null}
-                    >
-                        <Stack style={{width: "100%"}} >
-                            <Stack horizontal horizontalAlign='start' verticalAlign='center'>
-                                <Text
-                                    className={styles.accordionTitle}
-                                    onClick={toggleIsRefAccordionOpen}
-                                    aria-label="Open references"
-                                    tabIndex={0}
-                                    role="button"
-                                >
-                                <span>{parsedAnswer.citations.length > 1 ? parsedAnswer.citations.length + " references" : "1 reference"}</span>
-                                </Text>
-                                <FontIcon className={styles.accordionIcon}
-                                onClick={handleChevronClick} iconName={chevronIsExpanded ? 'ChevronDown' : 'ChevronRight'}
-                                />
-                            </Stack>
-                            
-                        </Stack>
-                                
-                    </Stack.Item>
-                )}
-                <Stack.Item className={styles.answerDisclaimerContainer}>
-                    <span className={styles.answerDisclaimer}>AI-generated content may be incorrect</span>
-                </Stack.Item>
-                </Stack>
-                {chevronIsExpanded && 
-                    <div style={{ marginTop: 8, display: "flex", flexFlow: "wrap column", maxHeight: "150px", gap: "4px" }}>
-                        {parsedAnswer.citations.map((citation, idx) => {
-                            return (
-                                <span 
-                                    title={createCitationFilepath(citation, ++idx)} 
-                                    tabIndex={0} 
-                                    role="link" 
-                                    key={idx}
-                                    className={styles.citationContainer}
-                                    aria-label={createCitationFilepath(citation, idx)} 
-                                    onClick={() => window.open(datasheetURL, '_blank')}
-                                    onKeyDown={(event) => {
-                                        if (event.key === "Enter" || event.key === " ") {
-                                          window.open(datasheetURL, '_blank');
-                                        }
-                                      }}
-                    
-                                >
-                                    <div className={styles.citation}>{idx}</div>
-                                    {createCitationFilepath(citation, idx, true)}
-                                </span>);
-                        })}
-                    </div>
-}
+  
+  return (
+    <>
+      {error && retryCount < maxRetries && (
+        <div className="error-message">
+          An error occurred: {error}
+          <button onClick={() => setRetryCount((prev) => prev + 1)}>Retry</button>
+        </div>
+      )}
+      <Stack className={styles.answerContainer} tabIndex={0}>
+        {!error && (
+          <ReactMarkdown
+            linkTarget="_blank"
+            remarkPlugins={[remarkGfm, supersub]}
+            children={DOMPurify.sanitize(chatbotResponse, { ALLOWED_TAGS: XSSAllowTags })}
+            className={styles.answerText}
+          />
+        )}
+        {datasheetURL && (
+          <p>
+            Datasheet: <a href={datasheetURL} target="_blank" rel="noopener noreferrer">View Datasheet</a>
+          </p>
+        )}
+        <Stack horizontal grow>
+          <Stack.Item grow>
+            {/* Additional content here */}
+          </Stack.Item>
+          <Stack.Item>
+            {FEEDBACK_ENABLED && answer.message_id && (
+              <Stack horizontal horizontalAlign="space-between">
+                <ThumbLike20Filled
+                  aria-hidden="false"
+                  aria-label="Like this response"
+                  onClick={onLikeResponseClicked}
+                  style={feedbackState === Feedback.Positive ? { color: "darkgreen", cursor: "pointer" } : { color: "slategray", cursor: "pointer" }}
+                />
+                <ThumbDislike20Filled
+                  aria-hidden="false"
+                  aria-label="Dislike this response"
+                  onClick={onDislikeResponseClicked}
+                  style={feedbackState === Feedback.Negative ? { color: "darkred", cursor: "pointer" } : { color: "slategray", cursor: "pointer" }}
+                />
+              </Stack>
+            )}
+          </Stack.Item>
+        </Stack>
+        {!!parsedAnswer.citations.length && (
+          <Stack.Item className={styles.answerFooter}>
+            <Stack horizontal horizontalAlign='start' verticalAlign='center'>
+              <Text
+                className={styles.accordionTitle}
+                onClick={toggleIsRefAccordionOpen}
+                aria-label="Open references"
+                tabIndex={0}
+                role="button"
+              >
+                <span>{parsedAnswer.citations.length > 1 ? `${parsedAnswer.citations.length} references` : "1 reference"}</span>
+              </Text>
+              <FontIcon
+                className={styles.accordionIcon}
+                onClick={handleChevronClick}
+                iconName={chevronIsExpanded ? 'ChevronDown' : 'ChevronRight'}
+              />
             </Stack>
+            {chevronIsExpanded && (
+              <div style={{ marginTop: 8, display: "flex", flexFlow: "column wrap", maxHeight: "150px", gap: "4px" }}>
+                {parsedAnswer.citations.map((citation, idx) => (
+                  <span 
+                    key={idx}
+                    title={createCitationFilepath(citation, idx, true)} 
+                    tabIndex={0} 
+                    role="link"
+                    onClick={(event) => onCitationClicked(citation, event)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        onCitationClicked(citation, event);
+                      }
+                    }}
+                  >
+                    <div className={styles.citation}>{idx + 1}</div>
+                    {createCitationFilepath(citation, idx, true)}
+                  </span>
+                ))}
+              </div>
+            )}
+          </Stack.Item>
+        )}
+      </Stack>
             <Dialog 
                 onDismiss={() => {
                     resetFeedbackDialog();
@@ -409,4 +357,4 @@ export const Answer = ({ answer }: Props) => {
             </Dialog>
         </>
     );
-};
+};}
