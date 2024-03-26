@@ -44,50 +44,86 @@ export const Answer = ({ answer }: Props) => {
 
   const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+  const fetchLatestAnswerStatus = async (answerId: any) => {
+    try {
+        // Construct the URL to your Quart microservice endpoint for checking the answer status.
+        // Replace `https://yourquartmicroservice.com` with the actual URL of your Quart service.
+        const url = `https://quartazurefunction.azurewebsites.net/check-answer-status/${answerId}`;
+
+        const response = await fetch(url, {
+            method: 'GET', // This endpoint is designed to be accessed with a GET request.
+            headers: {
+                'Content-Type': 'application/json',
+                // Include any other headers your Quart service requires.
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch the latest answer status with status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        // Assuming the Quart microservice returns the updated answer directly.
+        // Adjust this based on the actual structure of your response.
+        return data.updatedAnswer;
+    } catch (error) {
+        console.error('Error fetching latest answer status:', error);
+        // Decide how to handle errors: you might retry, return a default message, or take other actions.
+        return "Generating answers..."; // Or handle this case differently based on your app's logic.
+    }
+};
+
   const fetchDatasheetInfo = async () => {
-    if (!answer || !answer.answer.trim()) return;
+    if (!answer || !answer.answer.trim() || answer.answer === "Generating answers...") return;
 
-try {  
     setIsFetching(true);
-    console.log('Delay starting');
-    //Wait for 4 seconds before making the API call 
-    await delay(4000);
-    console.log('Delay finished');
-    
-    const answerWithoutCitations = extractAnswerWithoutCitations(answer.answer);
-    const payload = { chat_output: { answer: answerWithoutCitations } };
+    let currentAnswer = answer.answer;
+    let attempts = 0;
 
-    const response = await fetch('https://quartazurefunction.azurewebsites.net/call-apim', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+    // Poll for the final answer
+    while (currentAnswer === "Generating answer..." && attempts < maxRetries) {
+      attempts += 1;
+      console.log(`Checking for final answer... Attempt ${attempts}`);
+      currentAnswer = await fetchLatestAnswerStatus(answer.message_id); // This should be the updated logic for checking the answer status
+      if (currentAnswer !== "Generating answer...") break; // Break the loop if we have the final answer
+      await delay(4000); // Wait before checking again
+    }
 
-      if (!response.ok) {
-        throw new Error(`API call failed with status: ${response.status}`);
-      }
+    if (currentAnswer === "Generating answer...") {
+      console.log('Failed to obtain final answer within retry limits.');
+      setIsFetching(false);
+      setError('Failed to obtain final answer.');
+      return;
+    }
 
+    // Continue with fetching datasheet info as before, now with the final answer
+    try {
+      console.log('Fetching datasheet info with final answer...');
+      const payload = { chat_output: { answer: currentAnswer } };
+      const response = await fetch('https://quartazurefunction.azurewebsites.net/call-apim', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+      if (!response.ok) throw new Error(`API call failed with status: ${response.status}`);
+      
       const data = await response.json();
       setDatasheetUrl(data.DataSheetLink);
-      setRetryCount(0); // Reset retry count after a successful fetch
+      setRetryCount(0);
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred');
-      if (retryCount < maxRetries) {
-        setTimeout(() => {
-          setRetryCount(retryCount + 1); // Increment retry count and trigger a retry
-        }, 3000); // Delay before retry
-      }
+      if (retryCount < maxRetries) setRetryCount(retryCount + 1);
     } finally {
-        setIsFetching(false);
+      setIsFetching(false);
     }
   };
 
-  // Trigger the datasheet fetch only when answer is available and has changed
   useEffect(() => {
-    if (answer && answer.answer.trim()) {
+    if (answer && answer.answer.trim() && answer.answer !== "Generating answers...") {
       fetchDatasheetInfo();
     }
-  }, [answer]); // Retry on answer change or retryCount increment
+  }, [answer]); // Dependency array
 
   const chatbotResponse = answer.answer; // Use your method to parse and display the response
 
